@@ -1,11 +1,119 @@
 const Job = require("../models/Job.model");
 const Student = require("../models/Student.model");
 const { asyncHandler } = require("../middleware/error.middleware");
-
+//const Job = require("../models/Job.model");
+//const Student = require("../models/Student.model");
+const Application = require("../models/Application.model");
+const XLSX = require("xlsx");
+//const { asyncHandler } = require("../middleware/error.middleware");
+const { sendEmail } = require("../utils/email.util");
 // Create job posting
 const createJob = asyncHandler(async (req, res) => {
   const job = await Job.create({ ...req.body, createdBy: req.user._id });
-  res.status(201).json({ success: true, message: "Job posting created.", data: job });
+
+  // Send email to all students instantly
+  try {
+    const allStudents = await Student.find().select("email name");
+
+    if (allStudents.length > 0) {
+      const emails = allStudents.map((s) => s.email).join(",");
+
+      await sendEmail({
+        to: emails,
+        subject: `New Placement Drive — ${job.companyName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #4F46E5;">New Placement Opportunity!</h2>
+            <p>Dear Student,</p>
+            <p>A new company has been added to the placement portal. Login to check your eligibility and apply before the deadline!</p>
+            
+            <div style="background: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin: 0 0 12px 0; color: #111827;">${job.companyName}</h3>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280; width: 140px;">Role</td>
+                  <td style="padding: 6px 0; font-weight: 600;">${job.jobRole}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280;">CTC</td>
+                  <td style="padding: 6px 0; font-weight: 600;">₹${job.ctc} LPA</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280;">Job Type</td>
+                  <td style="padding: 6px 0;">${job.jobType}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280;">Location</td>
+                  <td style="padding: 6px 0;">${job.location?.join(", ") || "TBD"}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280;">Sector</td>
+                  <td style="padding: 6px 0;">${job.sector}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280;">Min CGPA</td>
+                  <td style="padding: 6px 0;">${job.eligibility.minCgpa}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280;">Eligible Branches</td>
+                  <td style="padding: 6px 0;">${job.eligibility.allowedBranches.join(", ")}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280;">Apply By</td>
+                  <td style="padding: 6px 0; color: #DC2626; font-weight: 600;">
+                    ${new Date(job.applicationDeadline).toLocaleDateString("en-IN", {
+                      day: "numeric", month: "long", year: "numeric"
+                    })}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6B7280;">Drive Date</td>
+                  <td style="padding: 6px 0;">
+                    ${job.driveDate
+                      ? new Date(job.driveDate).toLocaleDateString("en-IN", {
+                          day: "numeric", month: "long", year: "numeric"
+                        })
+                      : "To be announced"}
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            ${job.jobDescription
+              ? `<p><strong>About the Role:</strong> ${job.jobDescription}</p>`
+              : ""}
+
+            ${job.rounds && job.rounds.length > 0
+              ? `<p><strong>Selection Rounds:</strong> ${job.rounds.map((r) => r.name).join(" → ")}</p>`
+              : ""}
+
+            <p style="margin-top: 20px;">
+              <a href="${process.env.CLIENT_URL}/jobs" 
+                style="background: #4F46E5; color: white; padding: 12px 24px; 
+                border-radius: 6px; text-decoration: none; font-weight: 600;">
+                View & Apply Now
+              </a>
+            </p>
+
+            <p style="color: #6B7280; font-size: 14px; margin-top: 24px;">
+              This is an automated notification from your college placement portal.<br>
+              Please do not reply to this email.
+            </p>
+          </div>
+        `,
+      });
+
+      console.log(`📧 Job notification sent to ${allStudents.length} students`);
+    }
+  } catch (err) {
+    console.error("❌ Failed to send job notification:", err.message);
+  }
+
+  res.status(201).json({
+    success: true,
+    message: "Job posting created.",
+    data: job,
+  });
 });
 
 // Update job posting
@@ -165,5 +273,189 @@ const getStats = asyncHandler(async (req, res) => {
     },
   });
 });
+// @desc    Get all applicants for a job
+// @route   GET /api/admin/jobs/:id/applicants
+const getApplicants = asyncHandler(async (req, res) => {
+  const { status, branch, minCgpa } = req.query;
+  const query = { job: req.params.id };
+  if (status) query.status = status;
 
-module.exports = { createJob, updateJob, deleteJob, getAllJobs, getStats };
+  let applicants = await Application.find(query)
+    .populate("student", "name rollNo email phone branch cgpa activeBacklogs isPlaced photoUrl resumeUrl")
+    .sort({ appliedAt: -1 });
+
+  // Optional filters
+  if (branch) applicants = applicants.filter((a) => a.student?.branch === branch);
+  if (minCgpa) applicants = applicants.filter((a) => a.student?.cgpa >= parseFloat(minCgpa));
+
+  res.json({ success: true, count: applicants.length, data: applicants });
+});
+
+// @desc    Update application status
+// @route   PATCH /api/admin/applications/:id/status
+const updateApplicationStatus = asyncHandler(async (req, res) => {
+  const { status, adminRemarks, roundName } = req.body;
+
+  const application = await Application.findById(req.params.id)
+    .populate("student job");
+  if (!application) return res.status(404).json({ success: false, message: "Application not found." });
+
+  application.status = status;
+  if (adminRemarks) application.adminRemarks = adminRemarks;
+
+  // Track round cleared
+  if (roundName) {
+    application.roundsCleared.push({
+      roundName,
+      clearedAt: new Date(),
+      remarks: adminRemarks,
+    });
+  }
+
+  await application.save();
+
+  // If selected — mark student as placed
+  if (status === "selected") {
+    await Student.findByIdAndUpdate(application.student._id, {
+      isPlaced: true,
+      placedAt: application.job._id,
+      placedCompany: application.job.companyName,
+      ctcOffered: application.job.ctc,
+    });
+    await Job.findByIdAndUpdate(application.job._id, { $inc: { totalSelected: 1 } });
+
+    await sendEmail({
+      to: application.student.email,
+      subject: `Congratulations! Selected at ${application.job.companyName}`,
+      html: `
+        <h2>Congratulations, ${application.student.name}!</h2>
+        <p>You have been <strong>selected</strong> for <strong>${application.job.jobRole}</strong> 
+        at <strong>${application.job.companyName}</strong>.</p>
+        <p>CTC: ₹${application.job.ctc} LPA</p>
+        <p>The placement cell will share the offer letter shortly.</p>
+      `,
+    });
+  }
+
+  if (status === "rejected") {
+    await sendEmail({
+      to: application.student.email,
+      subject: `Update on your application at ${application.job.companyName}`,
+      html: `
+        <p>Dear ${application.student.name},</p>
+        <p>We regret to inform you that you were not selected for 
+        <strong>${application.job.jobRole}</strong> at <strong>${application.job.companyName}</strong>.</p>
+        <p>Keep applying — best of luck!</p>
+      `,
+    });
+  }
+
+  res.json({ success: true, message: "Status updated.", data: application });
+});
+
+// @desc    Export applicants to Excel
+// @route   GET /api/admin/jobs/:id/export
+const exportApplicantsExcel = asyncHandler(async (req, res) => {
+  const job = await Job.findById(req.params.id);
+  if (!job) return res.status(404).json({ success: false, message: "Job not found." });
+
+  const applications = await Application.find({ job: req.params.id })
+    .populate("student", "name rollNo email phone branch cgpa activeBacklogs totalBacklogs isPlaced")
+    .sort({ appliedAt: -1 });
+
+  const rows = applications.map((app, i) => ({
+    "#": i + 1,
+    "Name": app.student?.name || "N/A",
+    "Roll No": app.student?.rollNo || "N/A",
+    "Email": app.student?.email || "N/A",
+    "Phone": app.student?.phone || "N/A",
+    "Branch": app.student?.branch || "N/A",
+    "CGPA": app.student?.cgpa || "N/A",
+    "Active Backlogs": app.student?.activeBacklogs ?? 0,
+    "Total Backlogs": app.student?.totalBacklogs ?? 0,
+    "Status": app.status,
+    "Applied At": new Date(app.appliedAt).toLocaleDateString("en-IN"),
+    "Remarks": app.adminRemarks || "",
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Applicants");
+
+  ws["!cols"] = [
+    { wch: 4 }, { wch: 25 }, { wch: 14 }, { wch: 30 },
+    { wch: 14 }, { wch: 8 }, { wch: 8 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 30 },
+  ];
+
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const filename = `${job.companyName.replace(/\s+/g, "_")}_applicants.xlsx`;
+
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.send(buffer);
+});
+
+// @desc    Get all students
+// @route   GET /api/admin/students
+const getAllStudents = asyncHandler(async (req, res) => {
+  const { branch, year, isPlaced, minCgpa, search } = req.query;
+  const query = {};
+
+  if (branch) query.branch = branch;
+  if (year) query.year = parseInt(year);
+  if (isPlaced !== undefined) query.isPlaced = isPlaced === "true";
+  if (minCgpa) query.cgpa = { $gte: parseFloat(minCgpa) };
+  if (search) query.$or = [
+    { name: { $regex: search, $options: "i" } },
+    { rollNo: { $regex: search, $options: "i" } },
+    { email: { $regex: search, $options: "i" } },
+  ];
+
+  const students = await Student.find(query).sort({ name: 1 });
+  res.json({ success: true, count: students.length, data: students });
+});
+
+// @desc    Verify a student
+// @route   PATCH /api/admin/students/:id/verify
+const verifyStudent = asyncHandler(async (req, res) => {
+  const student = await Student.findByIdAndUpdate(
+    req.params.id,
+    { isVerified: true },
+    { new: true }
+  );
+  res.json({ success: true, message: "Student verified.", data: student });
+});
+
+// @desc    Bulk notify students
+// @route   POST /api/admin/notify
+const bulkNotify = asyncHandler(async (req, res) => {
+  const { jobId, subject, message, branches } = req.body;
+
+  const query = { isVerified: true, isProfileComplete: true };
+  if (branches && branches.length) query.branch = { $in: branches };
+
+  if (jobId) {
+    const job = await Job.findById(jobId);
+    if (job) {
+      query.cgpa = { $gte: job.eligibility.minCgpa };
+      query.activeBacklogs = { $lte: job.eligibility.maxActiveBacklogs };
+      if (!job.eligibility.allowedBranches.includes("ALL")) {
+        query.branch = { $in: job.eligibility.allowedBranches };
+      }
+    }
+  }
+
+  const students = await Student.find(query).select("email name");
+  const emails = students.map((s) => s.email);
+
+  await sendEmail({ to: emails.join(","), subject, html: message });
+  res.json({ success: true, message: `Notification sent to ${emails.length} students.` });
+});
+
+module.exports = {
+  createJob, updateJob, deleteJob, getAllJobs,
+  getApplicants, updateApplicationStatus, exportApplicantsExcel,
+  getAllStudents, verifyStudent,
+  getStats, bulkNotify,
+};
