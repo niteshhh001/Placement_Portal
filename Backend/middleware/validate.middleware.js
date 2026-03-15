@@ -52,5 +52,26 @@ const createJobSchema = Joi.object({
     description: Joi.string(),
   })),
 });
+const registerRequestSchema = Joi.object({
+  name: Joi.string().min(2).max(60).required(),
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+  rollNo: Joi.string().required(),
+  branch: Joi.string().valid("CSE", "IT", "ECE", "EEE", "ME", "CE", "CHEM", "OTHER").required(),
+  year: Joi.number().valid(1, 2, 3, 4).required(),
+  phone: Joi.string().pattern(/^[6-9]\d{9}$/).required(),
+});
 
-module.exports = { validate, registerStudentSchema, loginSchema, createJobSchema };
+const verifyOtpSchema = Joi.object({
+  email: Joi.string().email().required(),
+  otp: Joi.string().length(6).required(),
+});
+
+module.exports = {
+  validate,
+  registerStudentSchema,
+  registerRequestSchema,
+  verifyOtpSchema,
+  loginSchema,
+  createJobSchema,
+};
