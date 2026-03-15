@@ -1,4 +1,22 @@
 const express = require("express");
 const router = express.Router();
-// Week 2 — student profile routes go here
+const {
+  getProfile,
+  updateProfile,
+  uploadResume,
+  uploadPhoto,
+} = require("../controllers/student.controller");
+const { protect, studentOnly } = require("../middleware/auth.middleware");
+const {
+  uploadResume: resumeUpload,
+  uploadPhoto: photoUpload,
+} = require("../config/cloudinary");
+
+router.use(protect, studentOnly);
+
+router.get("/profile", getProfile);
+router.patch("/profile", updateProfile);
+router.post("/resume", resumeUpload.single("resume"), uploadResume);
+router.post("/photo", photoUpload.single("photo"), uploadPhoto);
+
 module.exports = router;
