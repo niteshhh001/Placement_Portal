@@ -12,15 +12,33 @@ export const AuthProvider = ({ children }) => {
     const savedUser = localStorage.getItem("user");
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
+      // Always fetch fresh user data from backend
+      refreshUser();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
+
+  const refreshUser = async () => {
+    try {
+      const res = await API.get("/auth/me");
+      setUser(res.data.user);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+    } catch (err) {
+      localStorage.clear();
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = (userData, accessToken, refreshToken) => {
     localStorage.setItem("token", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
+    // Fetch fresh data immediately after login
+    refreshUser();
   };
 
   const logout = () => {
@@ -30,7 +48,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

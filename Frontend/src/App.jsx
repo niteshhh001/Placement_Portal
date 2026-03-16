@@ -3,33 +3,41 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute, RoleRoute } from "./auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import StudentLayout from "./components/StudentLayout";
+import Dashboard from "./pages/student/Dashboard";
+import Jobs from "./pages/student/Jobs";
+import JobDetail from "./pages/student/JobDetail";
+import Applications from "./pages/student/Applications";
+import Profile from "./pages/student/Profile";
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public routes */}
+          {/* Public */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-
-          {/* Default redirect */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
-          {/* Student routes — Week 8 */}
-          <Route path="/student/*" element={
+          {/* Student */}
+          <Route path="/student" element={
             <RoleRoute role="student">
-              <div className="flex items-center justify-center h-screen text-gray-500">
-                Student dashboard coming in Week 8!
-              </div>
+              <StudentLayout />
             </RoleRoute>
-          } />
+          }>
+            <Route index element={<Dashboard />} />
+            <Route path="jobs" element={<Jobs />} />
+            <Route path="jobs/:id" element={<JobDetail />} />
+            <Route path="applications" element={<Applications />} />
+            <Route path="profile" element={<Profile />} />
+          </Route>
 
-          {/* Admin routes — Week 10 */}
+          {/* Admin — Week 10 */}
           <Route path="/admin/*" element={
             <RoleRoute role="admin">
               <div className="flex items-center justify-center h-screen text-gray-500">
-                Admin dashboard coming in Week 10!
+                Admin dashboard — coming in Week 10!
               </div>
             </RoleRoute>
           } />
