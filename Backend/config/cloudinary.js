@@ -10,14 +10,16 @@ cloudinary.config({
 
 const resumeStorage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: "placement-portal/resumes",
-    allowed_formats: ["pdf"],
-    resource_type: "raw",
-    type: "upload",
-    access_mode: "public",
+  params: async (req, file) => {
+    return {
+      folder: "placement-portal/resumes",
+      resource_type: "raw",
+      type: "upload",
+      access_mode: "public",
+    };
   },
 });
+
 const photoStorage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -30,6 +32,13 @@ const photoStorage = new CloudinaryStorage({
 const uploadResume = multer({
   storage: resumeStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF files are allowed"), false);
+    }
+  },
 });
 
 const uploadPhoto = multer({
