@@ -364,29 +364,40 @@ const exportApplicantsExcel = asyncHandler(async (req, res) => {
     .sort({ appliedAt: -1 });
 
   const rows = applications.map((app, i) => ({
-    "#": i + 1,
-    "Name": app.student?.name || "N/A",
-    "Roll No": app.student?.rollNo || "N/A",
-    "Email": app.student?.email || "N/A",
-    "Phone": app.student?.phone || "N/A",
-    "Branch": app.student?.branch || "N/A",
-    "CGPA": app.student?.cgpa || "N/A",
-    "Active Backlogs": app.student?.activeBacklogs ?? 0,
-    "Total Backlogs": app.student?.totalBacklogs ?? 0,
-    "Status": app.status,
-    "Applied At": new Date(app.appliedAt).toLocaleDateString("en-IN"),
-    "Remarks": app.adminRemarks || "",
-  }));
+  "#": i + 1,
+  "Name": app.student?.name || "N/A",
+  "Roll No": app.student?.rollNo || "N/A",
+  "Email": app.student?.email || "N/A",
+  "Phone": app.student?.phone || "N/A",
+  "Branch": app.student?.branch || "N/A",
+  "CGPA": app.student?.cgpa || "N/A",
+  "Active Backlogs": app.student?.activeBacklogs ?? 0,
+  "Total Backlogs": app.student?.totalBacklogs ?? 0,
+  "Status": app.status,
+  "Applied At": new Date(app.appliedAt).toLocaleDateString("en-IN"),
+  "Remarks": app.adminRemarks || "",
+  "Resume Link": app.student?.resumeUrl || "Not uploaded",
+}));
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Applicants");
 
-  ws["!cols"] = [
-    { wch: 4 }, { wch: 25 }, { wch: 14 }, { wch: 30 },
-    { wch: 14 }, { wch: 8 }, { wch: 8 }, { wch: 14 },
-    { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 30 },
-  ];
+ ws["!cols"] = [
+  { wch: 4 },  // #
+  { wch: 25 }, // Name
+  { wch: 14 }, // Roll No
+  { wch: 30 }, // Email
+  { wch: 14 }, // Phone
+  { wch: 8 },  // Branch
+  { wch: 8 },  // CGPA
+  { wch: 14 }, // Active Backlogs
+  { wch: 14 }, // Total Backlogs
+  { wch: 14 }, // Status
+  { wch: 14 }, // Applied At
+  { wch: 30 }, // Remarks
+  { wch: 60 }, // Resume Link
+];
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const filename = `${job.companyName.replace(/\s+/g, "_")}_applicants.xlsx`;
