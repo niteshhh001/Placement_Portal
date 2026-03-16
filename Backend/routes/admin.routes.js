@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   createJob, updateJob, deleteJob, getAllJobs,
   getApplicants, updateApplicationStatus, exportApplicantsExcel,
-  getAllStudents, verifyStudent,
+  getAllStudents, verifyStudent, blockStudent, unblockStudent,
   getStats, bulkNotify,
 } = require("../controllers/admin.controller");
 const { protect, adminOnly } = require("../middleware/auth.middleware");
@@ -28,6 +28,8 @@ router.patch("/applications/:id/status", updateApplicationStatus);
 // Student management
 router.get("/students", getAllStudents);
 router.patch("/students/:id/verify", verifyStudent);
+router.patch("/students/:id/block", blockStudent);
+router.patch("/students/:id/unblock", unblockStudent);
 
 // Notifications
 router.post("/notify", bulkNotify);

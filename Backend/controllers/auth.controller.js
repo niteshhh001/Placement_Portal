@@ -5,11 +5,8 @@ const Otp = require("../models/Otp.model");
 const { asyncHandler } = require("../middleware/error.middleware");
 const { sendEmail } = require("../utils/email.util");
 
-// ── Config ────────────────────────────────────────────────────────────────────
-// Add your allowed university domain here
 const ALLOWED_DOMAIN = process.env.UNIVERSITY_DOMAIN || "dtu.ac.in";
 
-// Generate tokens
 const generateTokens = (id, role) => {
   const accessToken = jwt.sign({ id, role }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
@@ -20,18 +17,15 @@ const generateTokens = (id, role) => {
   return { accessToken, refreshToken };
 };
 
-// Generate 6 digit OTP
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 // @desc    Step 1 — Validate email domain + send OTP
 // @route   POST /api/auth/student/register
-// @access  Public
 const registerStudent = asyncHandler(async (req, res) => {
   const { name, email, password, rollNo, branch, year, phone } = req.body;
 
-  // Check university email domain
   const emailDomain = email.split("@")[1];
   if (emailDomain !== ALLOWED_DOMAIN) {
     return res.status(400).json({
@@ -40,7 +34,6 @@ const registerStudent = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if email or rollNo already registered
   const exists = await Student.findOne({ $or: [{ email }, { rollNo }] });
   if (exists) {
     const field = exists.email === email ? "Email" : "Roll number";
@@ -50,20 +43,16 @@ const registerStudent = asyncHandler(async (req, res) => {
     });
   }
 
-  // Delete any previous OTP for this email
   await Otp.deleteMany({ email });
 
-  // Generate OTP
   const otp = generateOTP();
 
-  // Save OTP + registration data temporarily
   await Otp.create({
     email,
     otp,
     data: { name, email, password, rollNo, branch, year, phone },
   });
 
-  // Send OTP email
   await sendEmail({
     to: email,
     subject: "Verify your email — Placement Portal",
@@ -89,11 +78,9 @@ const registerStudent = asyncHandler(async (req, res) => {
 
 // @desc    Step 2 — Verify OTP + create account
 // @route   POST /api/auth/student/verify-otp
-// @access  Public
 const verifyOtp = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
-  // Find OTP record
   const otpRecord = await Otp.findOne({ email });
 
   if (!otpRecord) {
@@ -103,7 +90,6 @@ const verifyOtp = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check OTP match
   if (otpRecord.otp !== otp) {
     return res.status(400).json({
       success: false,
@@ -111,17 +97,14 @@ const verifyOtp = asyncHandler(async (req, res) => {
     });
   }
 
-  // OTP is valid — create the student account
   const { name, password, rollNo, branch, year, phone } = otpRecord.data;
 
   const student = await Student.create({
     name, email, password, rollNo, branch, year, phone,
   });
 
-  // Delete OTP record
   await Otp.deleteMany({ email });
 
-  // Generate tokens
   const { accessToken, refreshToken } = generateTokens(student._id, "student");
 
   res.status(201).json({
@@ -141,7 +124,6 @@ const verifyOtp = asyncHandler(async (req, res) => {
 
 // @desc    Login — student or admin
 // @route   POST /api/auth/login
-// @access  Public
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
@@ -157,6 +139,15 @@ const login = asyncHandler(async (req, res) => {
     return res.status(401).json({
       success: false,
       message: "Invalid email or password.",
+    });
+  }
+
+  // Check if student is blocked — prevent login
+  if (role === "student" && user.isBlocked) {
+    return res.status(403).json({
+      success: false,
+      message: `Your account has been debarred. Reason: ${user.blockReason || "Unfair means"}. Please contact the placement cell.`,
+      isBlocked: true,
     });
   }
 
@@ -179,7 +170,6 @@ const login = asyncHandler(async (req, res) => {
 
 // @desc    Refresh access token
 // @route   POST /api/auth/refresh
-// @access  Public
 const refreshToken = asyncHandler(async (req, res) => {
   const { refreshToken: token } = req.body;
   if (!token) {
@@ -195,9 +185,113 @@ const refreshToken = asyncHandler(async (req, res) => {
 
 // @desc    Get current user
 // @route   GET /api/auth/me
-// @access  Private
 const getMe = asyncHandler(async (req, res) => {
   res.json({ success: true, user: req.user });
 });
 
-module.exports = { registerStudent, verifyOtp, login, refreshToken, getMe };
+// @desc    Send password reset OTP
+// @route   POST /api/auth/forgot-password
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  let user = await Student.findOne({ email });
+  let role = "student";
+
+  if (!user) {
+    user = await Admin.findOne({ email });
+    role = "admin";
+  }
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "No account found with this email.",
+    });
+  }
+
+  await Otp.deleteMany({ email });
+
+  const otp = generateOTP();
+
+  await Otp.create({
+    email,
+    otp,
+    data: { role },
+  });
+
+  await sendEmail({
+    to: email,
+    subject: "Password Reset OTP — Placement Portal",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+        <h2 style="color: #4F46E5;">Reset Your Password</h2>
+        <p>Hi ${user.name},</p>
+        <p>You requested a password reset for your Placement Portal account.</p>
+        <div style="background: #F3F4F6; padding: 24px; border-radius: 8px; text-align: center; margin: 24px 0;">
+          <h1 style="letter-spacing: 8px; color: #111827; margin: 0;">${otp}</h1>
+        </div>
+        <p style="color: #6B7280;">This OTP is valid for <strong>10 minutes</strong>.</p>
+        <p style="color: #6B7280;">If you did not request this, please ignore this email.</p>
+      </div>
+    `,
+  });
+
+  res.json({
+    success: true,
+    message: `OTP sent to ${email}. Please check your inbox.`,
+  });
+});
+
+// @desc    Reset password with OTP
+// @route   POST /api/auth/reset-password
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  const otpRecord = await Otp.findOne({ email });
+
+  if (!otpRecord) {
+    return res.status(400).json({
+      success: false,
+      message: "OTP expired or not found. Please try again.",
+    });
+  }
+
+  if (otpRecord.otp !== otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid OTP. Please try again.",
+    });
+  }
+
+  let user = await Student.findOne({ email });
+  if (!user) {
+    user = await Admin.findOne({ email });
+  }
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found.",
+    });
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  await Otp.deleteMany({ email });
+
+  res.json({
+    success: true,
+    message: "Password reset successful! Please login with your new password.",
+  });
+});
+
+module.exports = {
+  registerStudent,
+  verifyOtp,
+  login,
+  refreshToken,
+  getMe,
+  forgotPassword,
+  resetPassword,
+};

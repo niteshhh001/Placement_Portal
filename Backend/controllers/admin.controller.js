@@ -464,9 +464,88 @@ const bulkNotify = asyncHandler(async (req, res) => {
   res.json({ success: true, message: `Notification sent to ${emails.length} students.` });
 });
 
+// Block a student
+const blockStudent = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+
+  const student = await Student.findByIdAndUpdate(
+    req.params.id,
+    {
+      isBlocked: true,
+      blockReason: reason || "Unfair means in placement process",
+    },
+    { new: true }
+  );
+
+  if (!student) {
+    return res.status(404).json({ success: false, message: "Student not found." });
+  }
+
+  // Send email to student
+  await sendEmail({
+    to: student.email,
+    subject: "Account Debarred — Placement Portal",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+        <h2 style="color: #DC2626;">Account Debarred</h2>
+        <p>Dear ${student.name},</p>
+        <p>Your placement portal account has been <strong>debarred</strong> by the placement cell.</p>
+        <div style="background: #FEF2F2; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #DC2626;">
+          <p style="margin: 0;"><strong>Reason:</strong> ${reason || "Unfair means in placement process"}</p>
+        </div>
+        <p>You will no longer be able to access the placement portal or apply to any companies.</p>
+        <p>If you believe this is a mistake, please contact the placement cell immediately.</p>
+      </div>
+    `,
+  });
+
+  res.json({
+    success: true,
+    message: `${student.name} has been debarred.`,
+    data: student,
+  });
+});
+
+// Unblock a student
+const unblockStudent = asyncHandler(async (req, res) => {
+  const student = await Student.findByIdAndUpdate(
+    req.params.id,
+    {
+      isBlocked: false,
+      blockReason: "",
+    },
+    { new: true }
+  );
+
+  if (!student) {
+    return res.status(404).json({ success: false, message: "Student not found." });
+  }
+
+  // Send email to student
+  await sendEmail({
+    to: student.email,
+    subject: "Account Reinstated — Placement Portal",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+        <h2 style="color: #16A34A;">Account Reinstated</h2>
+        <p>Dear ${student.name},</p>
+        <p>Your placement portal account has been <strong>reinstated</strong> by the placement cell.</p>
+        <p>You can now login and apply to companies again.</p>
+        <p>Please ensure you follow all placement rules going forward.</p>
+      </div>
+    `,
+  });
+
+  res.json({
+    success: true,
+    message: `${student.name} has been reinstated.`,
+    data: student,
+  });
+});
+
 module.exports = {
   createJob, updateJob, deleteJob, getAllJobs,
   getApplicants, updateApplicationStatus, exportApplicantsExcel,
-  getAllStudents, verifyStudent,
+  getAllStudents, verifyStudent, blockStudent, unblockStudent,
   getStats, bulkNotify,
 };
