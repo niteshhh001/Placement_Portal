@@ -34,6 +34,33 @@ export default function AdminStudents() {
     }
   };
 
+  const blockStudent = async (id, name) => {
+    const reason = window.prompt(`Enter reason for debarring ${name}:`);
+    if (!reason) return;
+    try {
+      await API.patch(`/admin/students/${id}/block`, { reason });
+      toast.success(`${name} has been debarred`);
+      fetchStudents();
+    } catch (err) {
+      toast.error("Failed to debar student");
+    }
+  };
+
+  const unblockStudent = async (id, name) => {
+    if (!window.confirm(`Reinstate ${name}'s account?`)) return;
+    try {
+      await API.patch(`/admin/students/${id}/unblock`);
+      toast.success(`${name} has been reinstated`);
+      fetchStudents();
+    } catch (err) {
+      toast.error("Failed to reinstate student");
+    }
+  };
+
+  const openResume = (url) => {
+    window.open(url, "_blank");
+  };
+
   const filtered = students.filter((s) => {
     const matchSearch = !search ||
       s.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -62,6 +89,9 @@ export default function AdminStudents() {
         <div className="flex gap-2 text-sm">
           <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
             {students.filter((s) => s.isPlaced).length} Placed
+          </span>
+          <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-medium">
+            {students.filter((s) => s.isBlocked).length} Debarred
           </span>
           <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-medium">
             {students.filter((s) => !s.isPlaced).length} Unplaced
@@ -116,7 +146,10 @@ export default function AdminStudents() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map((student) => (
-                <tr key={student._id} className="hover:bg-gray-50">
+                <tr
+                  key={student._id}
+                  className={`hover:bg-gray-50 ${student.isBlocked ? "bg-red-50" : ""}`}
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {student.photoUrl ? (
@@ -135,6 +168,7 @@ export default function AdminStudents() {
                       <div>
                         <p className="font-medium text-gray-900">{student.name}</p>
                         <p className="text-xs text-gray-500">{student.rollNo}</p>
+                        <p className="text-xs text-gray-400">{student.email}</p>
                       </div>
                     </div>
                   </td>
@@ -143,12 +177,23 @@ export default function AdminStudents() {
                   <td className="px-4 py-3 text-gray-600">{student.activeBacklogs ?? "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit
-                        ${student.isPlaced ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                        {student.isPlaced ? "Placed" : "Unplaced"}
-                      </span>
+                      {student.isBlocked ? (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-red-100 text-red-700">
+                          Debarred
+                        </span>
+                      ) : (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit
+                          ${student.isPlaced ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                          {student.isPlaced ? "Placed" : "Unplaced"}
+                        </span>
+                      )}
                       {!student.isVerified && (
                         <span className="text-xs text-orange-600">Not verified</span>
+                      )}
+                      {student.isBlocked && student.blockReason && (
+                        <span className="text-xs text-red-500 italic truncate max-w-32">
+                          {student.blockReason}
+                        </span>
                       )}
                     </div>
                   </td>
@@ -161,24 +206,36 @@ export default function AdminStudents() {
                     ) : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                     {student.resumeUrl && (
-                        <a
-  
-    href={`https://docs.google.com/viewer?url=${encodeURIComponent(student.resumeUrl)}&embedded=true`}
-    target="_blank"
-    rel="noreferrer"
-    className="text-xs text-indigo-600 hover:underline"
-  >
-    Resume
-  </a>
-)}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {student.resumeUrl && (
+                        <button
+                          onClick={() => openResume(student.resumeUrl)}
+                          className="text-xs text-indigo-600 hover:underline"
+                        >
+                          Resume
+                        </button>
+                      )}
                       {!student.isVerified && (
                         <button
                           onClick={() => verifyStudent(student._id)}
                           className="text-xs text-green-600 hover:underline font-medium"
                         >
                           Verify
+                        </button>
+                      )}
+                      {!student.isBlocked ? (
+                        <button
+                          onClick={() => blockStudent(student._id, student.name)}
+                          className="text-xs text-red-600 hover:underline font-medium"
+                        >
+                          Debar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => unblockStudent(student._id, student.name)}
+                          className="text-xs text-green-600 hover:underline font-medium"
+                        >
+                          Reinstate
                         </button>
                       )}
                     </div>

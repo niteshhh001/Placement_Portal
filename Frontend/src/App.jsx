@@ -16,6 +16,7 @@ import CreateJob from "./pages/admin/CreateJob";
 import Applicants from "./pages/admin/Applicants";
 import AdminStudents from "./pages/admin/Students";
 import Notifications from "./pages/admin/Notifications";
+import ForgotPassword from "./pages/ForgotPassword";
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Student */}
           <Route path="/student" element={

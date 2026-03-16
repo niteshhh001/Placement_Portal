@@ -18,6 +18,13 @@ API.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
+    // Handle blocked student
+    if (error.response?.status === 403 && error.response?.data?.isBlocked) {
+      localStorage.clear();
+      window.location.href = "/login?blocked=true";
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
@@ -38,5 +45,6 @@ API.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
 
 export default API;
