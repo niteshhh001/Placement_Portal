@@ -41,42 +41,42 @@ export default function Profile() {
   };
 
   const onSubmit = async (data) => {
-  setSaving(true);
-  try {
-    await API.patch("/student/profile", { ...data, skills });
-    toast.success("Profile updated!");
-    await refreshUser(); // refresh user in context
-    fetchProfile();
-  } catch (err) {
-    toast.error(err.response?.data?.message || "Update failed");
-  } finally {
-    setSaving(false);
-  }
-};
+    setSaving(true);
+    try {
+      await API.patch("/student/profile", { ...data, skills });
+      toast.success("Profile updated!");
+      await refreshUser();
+      fetchProfile();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Update failed");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleResumeUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  if (file.type !== "application/pdf") {
-    toast.error("Only PDF files allowed");
-    return;
-  }
-  setUploadingResume(true);
-  const formData = new FormData();
-  formData.append("resume", file);
-  try {
-    await API.post("/student/resume", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    toast.success("Resume uploaded!");
-    await refreshUser(); // refresh user in context
-    fetchProfile();
-  } catch (err) {
-    toast.error("Resume upload failed");
-  } finally {
-    setUploadingResume(false);
-  }
-};
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Only PDF files allowed");
+      return;
+    }
+    setUploadingResume(true);
+    const formData = new FormData();
+    formData.append("resume", file);
+    try {
+      await API.post("/student/resume", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Resume uploaded!");
+      await refreshUser();
+      fetchProfile();
+    } catch (err) {
+      toast.error("Resume upload failed");
+    } finally {
+      setUploadingResume(false);
+    }
+  };
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -107,6 +107,10 @@ export default function Profile() {
   const removeSkill = (skill) => {
     setSkills(skills.filter((s) => s !== skill));
   };
+
+const openResume = (url) => {
+  window.open(url, "_blank");
+};
 
   const fields = [
     profile?.name, profile?.email, profile?.phone,
@@ -325,14 +329,12 @@ export default function Profile() {
               <span className="text-sm text-green-700 font-medium">Resume uploaded</span>
             </div>
             <div className="flex items-center gap-3">
-              <a
-                href={profile.resumeUrl}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                onClick={() => openResume(profile.resumeUrl)}
                 className="text-xs text-indigo-600 hover:underline font-medium"
               >
                 View
-              </a>
+              </button>
               <label className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer">
                 {uploadingResume ? "Uploading..." : "Replace"}
                 <input

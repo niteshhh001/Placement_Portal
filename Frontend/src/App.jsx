@@ -9,6 +9,13 @@ import Jobs from "./pages/student/Jobs";
 import JobDetail from "./pages/student/JobDetail";
 import Applications from "./pages/student/Applications";
 import Profile from "./pages/student/Profile";
+import AdminLayout from "./components/AdminLayout";
+import AdminDashboard from "./pages/admin/Dashboard";
+import AdminJobs from "./pages/admin/Jobs";
+import CreateJob from "./pages/admin/CreateJob";
+import Applicants from "./pages/admin/Applicants";
+import AdminStudents from "./pages/admin/Students";
+import Notifications from "./pages/admin/Notifications";
 
 function App() {
   return (
@@ -33,14 +40,19 @@ function App() {
             <Route path="profile" element={<Profile />} />
           </Route>
 
-          {/* Admin — Week 10 */}
-          <Route path="/admin/*" element={
+          {/* Admin */}
+          <Route path="/admin" element={
             <RoleRoute role="admin">
-              <div className="flex items-center justify-center h-screen text-gray-500">
-                Admin dashboard — coming in Week 10!
-              </div>
+              <AdminLayout />
             </RoleRoute>
-          } />
+          }>
+            <Route index element={<AdminDashboard />} />
+            <Route path="jobs" element={<AdminJobs />} />
+            <Route path="jobs/create" element={<CreateJob />} />
+            <Route path="jobs/:id/applicants" element={<Applicants />} />
+            <Route path="students" element={<AdminStudents />} />
+            <Route path="notifications" element={<Notifications />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </AuthProvider>
