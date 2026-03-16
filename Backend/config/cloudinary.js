@@ -14,9 +14,10 @@ const resumeStorage = new CloudinaryStorage({
     folder: "placement-portal/resumes",
     allowed_formats: ["pdf"],
     resource_type: "raw",
+    type: "upload",
+    access_mode: "public",
   },
 });
-
 const photoStorage = new CloudinaryStorage({
   cloudinary,
   params: {
