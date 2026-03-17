@@ -13,9 +13,9 @@ const resumeStorage = new CloudinaryStorage({
   params: async (req, file) => {
     return {
       folder: "placement-portal/resumes",
-      resource_type: "raw",
-      type: "upload",
-      access_mode: "public",
+      resource_type: "image",
+      public_id: `resume_${req.user._id}_${Date.now()}`,
+      format: "pdf",
     };
   },
 });
