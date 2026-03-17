@@ -92,6 +92,12 @@ const applyToJob = asyncHandler(async (req, res) => {
   if (!req.user.isProfileComplete) {
     return res.status(400).json({ success: false, message: "Please complete your profile before applying." });
   }
+  if (!req.user.isVerified) {
+  return res.status(403).json({
+    success: false,
+    message: "Your account is pending verification by the placement cell. Please wait for approval before applying.",
+  });
+}
 
   // Check duplicate application
   const existing = await Application.findOne({ student: req.user._id, job: job._id });

@@ -105,11 +105,39 @@ const verifyOtp = asyncHandler(async (req, res) => {
 
   await Otp.deleteMany({ email });
 
+  // Notify admin about new registration
+  try {
+    const Admin = require("../models/Admin.model");
+    const admins = await Admin.find().select("email");
+    const adminEmails = admins.map((a) => a.email).join(",");
+
+    await sendEmail({
+      to: adminEmails,
+      subject: "New Student Registration — Verification Required",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #4F46E5;">New Student Registration</h2>
+          <p>A new student has registered on the Placement Portal and requires verification.</p>
+          <div style="background: #F3F4F6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0;"><strong>Name:</strong> ${name}</p>
+            <p style="margin: 8px 0 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 8px 0 0;"><strong>Roll No:</strong> ${rollNo}</p>
+            <p style="margin: 8px 0 0;"><strong>Branch:</strong> ${branch}</p>
+            <p style="margin: 8px 0 0;"><strong>Year:</strong> ${year}</p>
+          </div>
+          <p>Please login to the admin portal and verify this student.</p>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.error("Failed to notify admin:", err.message);
+  }
+
   const { accessToken, refreshToken } = generateTokens(student._id, "student");
 
   res.status(201).json({
     success: true,
-    message: "Registration successful! Welcome to the Placement Portal.",
+    message: "Registration successful! Welcome to the Placement Portal. Please wait for admin verification before applying.",
     accessToken,
     refreshToken,
     user: {
@@ -118,6 +146,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
       email: student.email,
       rollNo: student.rollNo,
       role: "student",
+      isVerified: false,
     },
   });
 });
