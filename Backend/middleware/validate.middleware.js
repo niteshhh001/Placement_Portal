@@ -27,8 +27,7 @@ const loginSchema = Joi.object({
 const createJobSchema = Joi.object({
   companyName: Joi.string().min(2).required(),
   jobRole: Joi.string().required(),
-  jobType: Joi.string().valid("Full-time", "Intern", "Intern+PPO").default("Full-time"),
-  ctc: Joi.number().positive().required(),
+  jobType: Joi.string().valid("Full-time", "Intern", "Intern+PPO", "Intern+FTE").default("Full-time"),  ctc: Joi.number().positive().required(),
   stipend: Joi.number().positive(),
   location: Joi.array().items(Joi.string()),
   bond: Joi.number().min(0).default(0),
