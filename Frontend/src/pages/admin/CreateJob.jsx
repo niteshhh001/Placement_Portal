@@ -148,6 +148,7 @@ export default function CreateJob() {
                 <option value="Full-time">Full-time</option>
                 <option value="Intern">Internship</option>
                 <option value="Intern+PPO">Intern + PPO</option>
+                <option value="Intern+FTE">Intern + FTE</option>
               </select>
             </div>
             <div>
