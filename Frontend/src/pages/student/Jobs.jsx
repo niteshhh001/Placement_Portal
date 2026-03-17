@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import API from "../../api/axios";
-
+import { useAuth } from "../../context/AuthContext";
 const SECTORS = ["All", "IT", "Core", "Finance", "Consulting", "Government", "Other"];
 
 export default function Jobs() {
@@ -10,7 +10,7 @@ export default function Jobs() {
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("All");
   const [showEligible, setShowEligible] = useState(false);
-
+  const { user } = useAuth();
   useEffect(() => {
     fetchJobs();
   }, []);
@@ -46,6 +46,19 @@ export default function Jobs() {
         <h1 className="text-2xl font-bold text-gray-900">Job Listings</h1>
         <p className="text-gray-500 text-sm mt-1">{filtered.length} jobs found</p>
       </div>
+
+      {/* Verification Pending Banner */}
+  {!user?.isVerified && (
+  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+    <span className="text-yellow-500 text-xl shrink-0">⏳</span>
+    <div>
+      <p className="text-sm font-medium text-yellow-800">Account not verified yet</p>
+      <p className="text-xs text-yellow-700 mt-1">
+        You can browse jobs but the Apply button will be enabled only after admin verification.
+      </p>
+    </div>
+  </div>
+)}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">

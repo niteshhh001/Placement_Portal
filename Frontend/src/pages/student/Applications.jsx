@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 
 const statusColors = {
@@ -14,14 +15,13 @@ const statusColors = {
   "on-hold": "bg-gray-100 text-gray-700",
 };
 
-const statusSteps = [
-  "applied", "aptitude", "gd", "technical", "hr", "selected"
-];
+const statusSteps = ["applied", "aptitude", "gd", "technical", "hr", "selected"];
 
 export default function Applications() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [withdrawing, setWithdrawing] = useState(null);
 
   useEffect(() => {
     fetchApplications();
@@ -38,6 +38,26 @@ export default function Applications() {
     }
   };
 
+  const handleWithdraw = async (applicationId, companyName) => {
+    if (!window.confirm(`Are you sure you want to withdraw from ${companyName}? This cannot be undone.`)) return;
+    setWithdrawing(applicationId);
+    try {
+      await API.delete(`/applications/${applicationId}`);
+      toast.success(`Application withdrawn from ${companyName}`);
+      fetchApplications();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to withdraw");
+    } finally {
+      setWithdrawing(null);
+    }
+  };
+
+  const canWithdraw = (app) => {
+    if (app.status !== "applied") return false;
+    if (!app.job?.applicationDeadline) return true;
+    return new Date() <= new Date(app.job.applicationDeadline);
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -46,6 +66,7 @@ export default function Applications() {
 
   return (
     <div className="space-y-6">
+      <Toaster position="top-right" />
       <div>
         <h1 className="text-2xl font-bold text-gray-900">My Applications</h1>
         <p className="text-gray-500 text-sm mt-1">
@@ -56,21 +77,16 @@ export default function Applications() {
       {applications.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <p className="text-gray-400 text-sm">You haven't applied to any jobs yet.</p>
-          <Link
-            to="/student/jobs"
-            className="text-indigo-600 text-sm font-medium hover:underline mt-2 block"
-          >
+          <Link to="/student/jobs" className="text-indigo-600 text-sm font-medium hover:underline mt-2 block">
             Browse Jobs →
           </Link>
         </div>
       ) : (
         <div className="grid gap-4">
           {applications.map((app) => (
-            <div
-              key={app._id}
-              className="bg-white rounded-xl border border-gray-200 overflow-hidden"
-            >
-              {/* Application Header */}
+            <div key={app._id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+              {/* Header */}
               <div
                 className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 transition"
                 onClick={() => setSelected(selected === app._id ? null : app._id)}
@@ -98,7 +114,7 @@ export default function Applications() {
                 </div>
               </div>
 
-              {/* Expanded Details */}
+              {/* Expanded */}
               {selected === app._id && (
                 <div className="border-t border-gray-100 p-5 space-y-4">
 
@@ -115,15 +131,10 @@ export default function Applications() {
                             <div key={step} className="flex items-center flex-1">
                               <div className="flex flex-col items-center">
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-                                  ${isDone
-                                    ? "bg-indigo-600 text-white"
-                                    : "bg-gray-200 text-gray-400"
-                                  }`}>
+                                  ${isDone ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-400"}`}>
                                   {isDone ? "✓" : i + 1}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1 capitalize hidden sm:block">
-                                  {step}
-                                </p>
+                                <p className="text-xs text-gray-500 mt-1 capitalize hidden sm:block">{step}</p>
                               </div>
                               {!isLast && (
                                 <div className={`flex-1 h-0.5 mx-1 ${i < currentIndex ? "bg-indigo-600" : "bg-gray-200"}`} />
@@ -139,21 +150,15 @@ export default function Applications() {
                   {app.status === "rejected" && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                       <p className="text-sm text-red-700 font-medium">Not selected this time</p>
-                      <p className="text-xs text-red-600 mt-0.5">
-                        Keep applying — better opportunities await!
-                      </p>
+                      <p className="text-xs text-red-600 mt-0.5">Keep applying — better opportunities await!</p>
                     </div>
                   )}
 
                   {/* Selected Banner */}
                   {app.status === "selected" && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <p className="text-sm text-green-700 font-medium">
-                        🎉 Congratulations! You have been selected!
-                      </p>
-                      <p className="text-xs text-green-600 mt-0.5">
-                        The placement cell will share the offer letter shortly.
-                      </p>
+                      <p className="text-sm text-green-700 font-medium">🎉 Congratulations! You have been selected!</p>
+                      <p className="text-xs text-green-600 mt-0.5">The placement cell will share the offer letter shortly.</p>
                     </div>
                   )}
 
@@ -183,26 +188,45 @@ export default function Applications() {
                     </div>
                   )}
 
-                  {/* Footer Info */}
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 pt-2 border-t border-gray-100">
-                    <span>
-                      Applied: {new Date(app.appliedAt).toLocaleDateString("en-IN")}
-                    </span>
-                    {app.job?.driveDate && (
-                      <span>
-                        Drive: {new Date(app.job.driveDate).toLocaleDateString("en-IN")}
+                  {/* Footer */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-gray-500 pt-2 border-t border-gray-100">
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <span>Applied: {new Date(app.appliedAt).toLocaleDateString("en-IN")}</span>
+                      {app.job?.driveDate && (
+                        <span>Drive: {new Date(app.job.driveDate).toLocaleDateString("en-IN")}</span>
+                      )}
+                      {app.offerLetterUrl && (
+                        <a
+                          href={app.offerLetterUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-indigo-600 font-medium hover:underline"
+                        >
+                          Download Offer Letter
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Withdraw Button */}
+                    {canWithdraw(app) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleWithdraw(app._id, app.job?.companyName);
+                        }}
+                        disabled={withdrawing === app._id}
+                        className="text-xs text-red-600 hover:text-red-700 font-medium border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition disabled:opacity-50"
+                      >
+                        {withdrawing === app._id ? "Withdrawing..." : "Withdraw Application"}
+                      </button>
+                    )}
+
+                    {/* Can't withdraw message */}
+                    {app.status !== "applied" && app.status !== "rejected" && app.status !== "selected" && (
+                      <span className="text-xs text-gray-400 italic">
+                        Cannot withdraw — already in process
                       </span>
                     )}
-                    {app.offerLetterUrl && (
-  <a
-    href={app.offerLetterUrl}
-    target="_blank"
-    rel="noreferrer"
-    className="text-indigo-600 font-medium hover:underline"
-  >
-    Download Offer Letter
-  </a>
-)}
                   </div>
 
                 </div>

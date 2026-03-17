@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import ResumeViewer from "../../components/ResumeViewer";
+
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterBranch, setFilterBranch] = useState("");
   const [filterPlaced, setFilterPlaced] = useState("");
+  const [filterVerified, setFilterVerified] = useState("");
   const [viewingResume, setViewingResume] = useState(null);
+
   useEffect(() => {
     fetchStudents();
   }, []);
@@ -27,7 +30,7 @@ export default function AdminStudents() {
   const verifyStudent = async (id) => {
     try {
       await API.patch(`/admin/students/${id}/verify`);
-      toast.success("Student verified!");
+      toast.success("Student verified! Email sent to student.");
       fetchStudents();
     } catch (err) {
       toast.error("Failed to verify student");
@@ -57,9 +60,10 @@ export default function AdminStudents() {
     }
   };
 
-const openResume = (url) => {
-  setViewingResume(url);
-};
+  const openResume = (url) => {
+    setViewingResume(url);
+  };
+
   const filtered = students.filter((s) => {
     const matchSearch = !search ||
       s.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -68,7 +72,9 @@ const openResume = (url) => {
     const matchBranch = !filterBranch || s.branch === filterBranch;
     const matchPlaced = filterPlaced === "" ||
       (filterPlaced === "true" ? s.isPlaced : !s.isPlaced);
-    return matchSearch && matchBranch && matchPlaced;
+    const matchVerified = filterVerified === "" ||
+      (filterVerified === "verified" ? s.isVerified : !s.isVerified);
+    return matchSearch && matchBranch && matchPlaced && matchVerified;
   });
 
   if (loading) return (
@@ -80,23 +86,49 @@ const openResume = (url) => {
   return (
     <div className="space-y-6">
       <Toaster position="top-right" />
-      <div className="flex items-center justify-between">
+
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Students</h1>
           <p className="text-gray-500 text-sm mt-1">{students.length} registered students</p>
         </div>
-        <div className="flex gap-2 text-sm">
+        <div className="flex gap-2 text-sm flex-wrap">
           <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
             {students.filter((s) => s.isPlaced).length} Placed
+          </span>
+          <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-medium">
+            {students.filter((s) => !s.isVerified && !s.isBlocked).length} Pending Verification
           </span>
           <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-medium">
             {students.filter((s) => s.isBlocked).length} Debarred
           </span>
           <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-medium">
-            {students.filter((s) => !s.isPlaced).length} Unplaced
+            {students.filter((s) => !s.isPlaced && !s.isBlocked).length} Unplaced
           </span>
         </div>
       </div>
+
+      {/* Pending Verification Alert */}
+      {students.filter((s) => !s.isVerified && !s.isBlocked).length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+          <span className="text-yellow-500 text-xl shrink-0">⚠️</span>
+          <div>
+            <p className="text-sm font-medium text-yellow-800">
+              {students.filter((s) => !s.isVerified && !s.isBlocked).length} student(s) waiting for verification
+            </p>
+            <p className="text-xs text-yellow-700 mt-1">
+              These students cannot apply to any company until you verify them.
+              Use the filter below to find them quickly.
+            </p>
+          </div>
+          <button
+            onClick={() => setFilterVerified("unverified")}
+            className="shrink-0 text-xs font-medium text-yellow-700 border border-yellow-300 px-3 py-1.5 rounded-lg hover:bg-yellow-100 transition"
+          >
+            Show Pending
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
@@ -126,7 +158,29 @@ const openResume = (url) => {
           <option value="true">Placed</option>
           <option value="false">Unplaced</option>
         </select>
+        <select
+          value={filterVerified}
+          onChange={(e) => setFilterVerified(e.target.value)}
+          className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">All Verification Status</option>
+          <option value="verified">Verified</option>
+          <option value="unverified">Pending Verification</option>
+        </select>
+        {filterVerified && (
+          <button
+            onClick={() => setFilterVerified("")}
+            className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-2 rounded-lg"
+          >
+            Clear filter ×
+          </button>
+        )}
       </div>
+
+      {/* Showing count */}
+      <p className="text-xs text-gray-500">
+        Showing {filtered.length} of {students.length} students
+      </p>
 
       {/* Students Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -144,113 +198,127 @@ const openResume = (url) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((student) => (
-                <tr
-                  key={student._id}
-                  className={`hover:bg-gray-50 ${student.isBlocked ? "bg-red-50" : ""}`}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {student.photoUrl ? (
-                        <img
-                          src={student.photoUrl}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                          <span className="text-xs font-bold text-indigo-700">
-                            {student.name?.charAt(0)}
-                          </span>
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium text-gray-900">{student.name}</p>
-                        <p className="text-xs text-gray-500">{student.rollNo}</p>
-                        <p className="text-xs text-gray-400">{student.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{student.branch}</td>
-                  <td className="px-4 py-3 text-gray-600">{student.cgpa || "—"}</td>
-                  <td className="px-4 py-3 text-gray-600">{student.activeBacklogs ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      {student.isBlocked ? (
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-red-100 text-red-700">
-                          Debarred
-                        </span>
-                      ) : (
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit
-                          ${student.isPlaced ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                          {student.isPlaced ? "Placed" : "Unplaced"}
-                        </span>
-                      )}
-                      {!student.isVerified && (
-                        <span className="text-xs text-orange-600">Not verified</span>
-                      )}
-                      {student.isBlocked && student.blockReason && (
-                        <span className="text-xs text-red-500 italic truncate max-w-32">
-                          {student.blockReason}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {student.isPlaced ? (
-                      <div>
-                        <p className="font-medium text-gray-900">{student.placedCompany}</p>
-                        <p className="text-xs text-green-600">₹{student.ctcOffered} LPA</p>
-                      </div>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {student.resumeUrl && (
-                        <button
-                          onClick={() => openResume(student.resumeUrl)}
-                          className="text-xs text-indigo-600 hover:underline"
-                        >
-                          Resume
-                        </button>
-                      )}
-                      {!student.isVerified && (
-                        <button
-                          onClick={() => verifyStudent(student._id)}
-                          className="text-xs text-green-600 hover:underline font-medium"
-                        >
-                          Verify
-                        </button>
-                      )}
-                      {!student.isBlocked ? (
-                        <button
-                          onClick={() => blockStudent(student._id, student.name)}
-                          className="text-xs text-red-600 hover:underline font-medium"
-                        >
-                          Debar
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => unblockStudent(student._id, student.name)}
-                          className="text-xs text-green-600 hover:underline font-medium"
-                        >
-                          Reinstate
-                        </button>
-                      )}
-                    </div>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400 text-sm">
+                    No students found matching your filters.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filtered.map((student) => (
+                  <tr
+                    key={student._id}
+                    className={`hover:bg-gray-50 ${student.isBlocked ? "bg-red-50" : !student.isVerified ? "bg-yellow-50" : ""}`}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {student.photoUrl ? (
+                          <img
+                            src={student.photoUrl}
+                            alt=""
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-bold text-indigo-700">
+                              {student.name?.charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-900">{student.name}</p>
+                          <p className="text-xs text-gray-500">{student.rollNo}</p>
+                          <p className="text-xs text-gray-400">{student.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{student.branch}</td>
+                    <td className="px-4 py-3 text-gray-600">{student.cgpa || "—"}</td>
+                    <td className="px-4 py-3 text-gray-600">{student.activeBacklogs ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        {student.isBlocked ? (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-red-100 text-red-700">
+                            Debarred
+                          </span>
+                        ) : (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit
+                            ${student.isPlaced ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                            {student.isPlaced ? "Placed" : "Unplaced"}
+                          </span>
+                        )}
+                        {!student.isVerified && !student.isBlocked && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-yellow-100 text-yellow-700">
+                            ⏳ Pending Verification
+                          </span>
+                        )}
+                        {student.isVerified && (
+                          <span className="text-xs text-green-600">✓ Verified</span>
+                        )}
+                        {student.isBlocked && student.blockReason && (
+                          <span className="text-xs text-red-500 italic truncate max-w-32">
+                            {student.blockReason}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {student.isPlaced ? (
+                        <div>
+                          <p className="font-medium text-gray-900">{student.placedCompany}</p>
+                          <p className="text-xs text-green-600">₹{student.ctcOffered} LPA</p>
+                        </div>
+                      ) : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {student.resumeUrl && (
+                          <button
+                            onClick={() => openResume(student.resumeUrl)}
+                            className="text-xs text-indigo-600 hover:underline"
+                          >
+                            Resume
+                          </button>
+                        )}
+                        {!student.isVerified && (
+                          <button
+                            onClick={() => verifyStudent(student._id)}
+                            className="text-xs text-green-600 hover:underline font-medium bg-green-50 px-2 py-1 rounded"
+                          >
+                            ✓ Verify
+                          </button>
+                        )}
+                        {!student.isBlocked ? (
+                          <button
+                            onClick={() => blockStudent(student._id, student.name)}
+                            className="text-xs text-red-600 hover:underline font-medium"
+                          >
+                            Debar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => unblockStudent(student._id, student.name)}
+                            className="text-xs text-green-600 hover:underline font-medium"
+                          >
+                            Reinstate
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
       {viewingResume && (
-  <ResumeViewer
-    url={viewingResume}
-    onClose={() => setViewingResume(null)}
-  />
-)}
+        <ResumeViewer
+          url={viewingResume}
+          onClose={() => setViewingResume(null)}
+        />
+      )}
     </div>
   );
 }

@@ -65,6 +65,23 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {/* Verification Pending Banner */}
+{!user?.isVerified && (
+  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+    <span className="text-yellow-500 text-xl shrink-0">⏳</span>
+    <div>
+      <p className="text-sm font-medium text-yellow-800">
+        Account Verification Pending
+      </p>
+      <p className="text-xs text-yellow-700 mt-1">
+        Your account is pending verification by the placement cell.
+        You can browse jobs but cannot apply until verified.
+        This usually takes 1-2 working days.
+      </p>
+    </div>
+  </div>
+)}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
