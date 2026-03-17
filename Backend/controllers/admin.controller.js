@@ -435,7 +435,31 @@ const verifyStudent = asyncHandler(async (req, res) => {
     { isVerified: true },
     { new: true }
   );
-  res.json({ success: true, message: "Student verified.", data: student });
+
+  if (!student) {
+    return res.status(404).json({ success: false, message: "Student not found." });
+  }
+
+  // Send verification email to student
+  await sendEmail({
+    to: student.email,
+    subject: "Account Verified — You can now apply to companies!",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+        <h2 style="color: #16A34A;">Account Verified! ✅</h2>
+        <p>Dear ${student.name},</p>
+        <p>Your placement portal account has been <strong>verified</strong> by the placement cell.</p>
+        <p>You can now login and apply to companies on the portal.</p>
+        <div style="background: #F0FDF4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Roll No:</strong> ${student.rollNo}</p>
+          <p style="margin: 8px 0 0;"><strong>Branch:</strong> ${student.branch}</p>
+        </div>
+        <p>Good luck with your placements!</p>
+      </div>
+    `,
+  });
+
+  res.json({ success: true, message: "Student verified. Email sent.", data: student });
 });
 
 // @desc    Bulk notify students
