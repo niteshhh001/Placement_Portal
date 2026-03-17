@@ -131,9 +131,10 @@ export default function JobDetail() {
           <div>
             <p className="text-gray-500">Application Deadline</p>
             <p className="font-medium text-red-600 mt-0.5">
-              {new Date(job.applicationDeadline).toLocaleDateString("en-IN", {
-                day: "numeric", month: "long", year: "numeric"
-              })}
+  {new Date(job.applicationDeadline).toLocaleString("en-IN", {
+  day: "numeric", month: "long", year: "numeric",
+  hour: "2-digit", minute: "2-digit", hour12: true
+})}
             </p>
           </div>
           <div>

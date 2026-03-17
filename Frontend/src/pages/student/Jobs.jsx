@@ -122,7 +122,10 @@ export default function Jobs() {
                     <span>💰 ₹{job.ctc} LPA</span>
                     <span>📍 {job.location?.join(", ") || "TBD"}</span>
                     <span>🏢 {job.sector}</span>
-                    <span>📅 Apply by {new Date(job.applicationDeadline).toLocaleDateString("en-IN")}</span>
+                    <span>📅 Apply by {new Date(job.applicationDeadline).toLocaleString("en-IN", {
+  day: "numeric", month: "short", year: "numeric",
+  hour: "2-digit", minute: "2-digit", hour12: true
+})}</span>
                   </div>
 
                   {/* Ineligibility reasons */}
