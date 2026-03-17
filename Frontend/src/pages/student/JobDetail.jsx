@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
-
+import { useAuth } from "../../context/AuthContext";
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -10,7 +10,7 @@ export default function JobDetail() {
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
-
+  const { user } = useAuth();
   useEffect(() => {
     fetchJob();
   }, [id]);
@@ -76,19 +76,23 @@ export default function JobDetail() {
           </div>
 
           {/* Apply Button */}
-          {job.eligible ? (
-            <button
-              onClick={handleApply}
-              disabled={applying || applied}
-              className="shrink-0 bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {applied ? "Applied ✓" : applying ? "Applying..." : "Apply Now"}
-            </button>
-          ) : (
-            <span className="shrink-0 text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-lg">
-              Not Eligible
-            </span>
-          )}
+        {!user?.isVerified ? (
+  <span className="shrink-0 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 px-4 py-2 rounded-lg">
+    ⏳ Verification Pending
+  </span>
+) : job.eligible ? (
+  <button
+    onClick={handleApply}
+    disabled={applying || applied}
+    className="shrink-0 bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+  >
+    {applied ? "Applied ✓" : applying ? "Applying..." : "Apply Now"}
+  </button>
+) : (
+  <span className="shrink-0 text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-lg">
+    Not Eligible
+  </span>
+)}
         </div>
 
         {/* Ineligibility reasons */}
