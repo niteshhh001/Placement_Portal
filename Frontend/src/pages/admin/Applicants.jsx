@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
-
+import ResumeViewer from "../../components/ResumeViewer";
 const statusOptions = [
   "applied", "shortlisted", "aptitude", "gd",
   "technical", "hr", "selected", "rejected", "on-hold"
 ];
+
 
 const statusColors = {
   applied: "bg-blue-100 text-blue-700",
@@ -30,7 +31,7 @@ export default function Applicants() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterBranch, setFilterBranch] = useState("");
   const [remarks, setRemarks] = useState({});
-
+  const [viewingResume, setViewingResume] = useState(null);
   useEffect(() => {
     fetchData();
   }, [id]);
@@ -84,6 +85,10 @@ export default function Applicants() {
       toast.error("Export failed");
     }
   };
+
+const openResume = (url) => {
+  setViewingResume(url);
+};
 
   const filtered = applicants.filter((a) => {
     const matchStatus = !filterStatus || a.status === filterStatus;
@@ -211,18 +216,15 @@ export default function Applicants() {
                     </td>
                     <td className="px-4 py-3">
                       {app.student?.resumeUrl ? (
-                        <a
-  
-    href={`https://docs.google.com/viewer?url=${encodeURIComponent(app.student.resumeUrl)}&embedded=true`}
-    target="_blank"
-    rel="noreferrer"
-    className="text-xs text-indigo-600 hover:underline font-medium"
-  >
-    View
-  </a>
-) : (
-  <span className="text-xs text-gray-400">None</span>
-)}
+                        <button
+                          onClick={() => openResume(app.student.resumeUrl)}
+                          className="text-xs text-indigo-600 hover:underline font-medium"
+                        >
+                          View
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">None</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -231,6 +233,12 @@ export default function Applicants() {
           </div>
         </div>
       )}
+      {viewingResume && (
+  <ResumeViewer
+    url={viewingResume}
+    onClose={() => setViewingResume(null)}
+  />
+)}
     </div>
   );
 }

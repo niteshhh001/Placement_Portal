@@ -38,6 +38,8 @@ const studentSchema = new mongoose.Schema(
     ctcOffered: { type: Number },
     isProfileComplete: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
+    isBlocked: { type: Boolean, default: false },
+    blockReason: { type: String, default: "" },
   },
   { timestamps: true }
 );
@@ -54,7 +56,7 @@ studentSchema.methods.comparePassword = async function (candidatePassword) {
 
 studentSchema.methods.checkProfileComplete = function () {
   const required = [this.name, this.rollNo, this.phone, this.branch, this.cgpa, this.resumeUrl];
-  this.isProfileComplete = required.every(Boolean) && this.education.length > 0;
+  this.isProfileComplete = required.every(Boolean);
   return this.isProfileComplete;
 };
 
