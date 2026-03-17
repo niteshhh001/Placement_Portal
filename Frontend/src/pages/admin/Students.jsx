@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
-
+import ResumeViewer from "../../components/ResumeViewer";
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterBranch, setFilterBranch] = useState("");
   const [filterPlaced, setFilterPlaced] = useState("");
-
+  const [viewingResume, setViewingResume] = useState(null);
   useEffect(() => {
     fetchStudents();
   }, []);
@@ -57,10 +57,9 @@ export default function AdminStudents() {
     }
   };
 
-  const openResume = (url) => {
-    window.open(url, "_blank");
-  };
-
+const openResume = (url) => {
+  setViewingResume(url);
+};
   const filtered = students.filter((s) => {
     const matchSearch = !search ||
       s.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -246,6 +245,12 @@ export default function AdminStudents() {
           </table>
         </div>
       </div>
+      {viewingResume && (
+  <ResumeViewer
+    url={viewingResume}
+    onClose={() => setViewingResume(null)}
+  />
+)}
     </div>
   );
 }

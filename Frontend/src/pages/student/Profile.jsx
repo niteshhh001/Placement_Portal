@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
-
+import ResumeViewer from "../../components/ResumeViewer";
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,7 +13,7 @@ export default function Profile() {
   const [skills, setSkills] = useState([]);
   const [skillInput, setSkillInput] = useState("");
   const { refreshUser } = useAuth();
-
+  const [viewingResume, setViewingResume] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export default function Profile() {
   };
 
 const openResume = (url) => {
-  window.open(url, "_blank");
+  setViewingResume(url);
 };
 
   const fields = [
@@ -362,6 +362,12 @@ const openResume = (url) => {
           </label>
         )}
       </div>
+      {viewingResume && (
+  <ResumeViewer
+    url={viewingResume}
+    onClose={() => setViewingResume(null)}
+  />
+)}
     </div>
   );
 }
