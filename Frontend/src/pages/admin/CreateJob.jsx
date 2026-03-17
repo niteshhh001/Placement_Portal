@@ -192,23 +192,27 @@ export default function CreateJob() {
                 {...register("jobDescription")}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Application Deadline</label>
-              <input
-                type="date"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                {...register("applicationDeadline", { required: "Deadline is required" })}
-              />
-              {errors.applicationDeadline && <p className="text-red-500 text-xs mt-1">{errors.applicationDeadline.message}</p>}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Drive Date</label>
-              <input
-                type="date"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                {...register("driveDate")}
-              />
-            </div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Application Deadline
+  </label>
+  <input
+    type="datetime-local"
+    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    {...register("applicationDeadline", { required: "Deadline is required" })}
+  />
+  {errors.applicationDeadline && (
+    <p className="text-red-500 text-xs mt-1">{errors.applicationDeadline.message}</p>
+  )}
+</div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Drive Date</label>
+  <input
+    type="datetime-local"
+    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    {...register("driveDate")}
+  />
+</div>
             <div className="col-span-2 flex items-center gap-2">
               <input
                 type="checkbox"
