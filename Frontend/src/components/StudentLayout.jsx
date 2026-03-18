@@ -7,6 +7,7 @@ const navItems = [
   { path: "/student/jobs", label: "Job Listings", icon: "💼" },
   { path: "/student/applications", label: "My Applications", icon: "📋" },
   { path: "/student/profile", label: "Profile", icon: "👤" },
+  { path: "/student/contact", label: "Contact Us", icon: "📩" },
 ];
 
 export default function StudentLayout() {
