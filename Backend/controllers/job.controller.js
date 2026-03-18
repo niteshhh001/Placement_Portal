@@ -10,6 +10,32 @@ const checkEligibility = (student, job) => {
   if (student.cgpa < eligibility.minCgpa)
     reasons.push(`CGPA must be ≥ ${eligibility.minCgpa} (yours: ${student.cgpa})`);
 
+  // Check 10th marks
+  if (eligibility.min10thMarks > 0) {
+    const tenth = student.education?.find((e) => e.level === "10th");
+    if (!tenth) {
+      reasons.push(`10th marks required (min ${eligibility.min10thMarks}%) — please update your profile`);
+    } else {
+      const marks = tenth.percentage || tenth.cgpa * 10 || 0;
+      if (marks < eligibility.min10thMarks) {
+        reasons.push(`10th marks must be ≥ ${eligibility.min10thMarks}% (yours: ${marks}%)`);
+      }
+    }
+  }
+
+  // Check 12th marks
+  if (eligibility.min12thMarks > 0) {
+    const twelfth = student.education?.find((e) => e.level === "12th");
+    if (!twelfth) {
+      reasons.push(`12th marks required (min ${eligibility.min12thMarks}%) — please update your profile`);
+    } else {
+      const marks = twelfth.percentage || twelfth.cgpa * 10 || 0;
+      if (marks < eligibility.min12thMarks) {
+        reasons.push(`12th marks must be ≥ ${eligibility.min12thMarks}% (yours: ${marks}%)`);
+      }
+    }
+  }
+
   const branchAllowed =
     eligibility.allowedBranches.includes("ALL") ||
     eligibility.allowedBranches.includes(student.branch);
