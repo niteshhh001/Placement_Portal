@@ -42,14 +42,16 @@ export default function CreateJob() {
         ...data,
         ctc: parseFloat(data.ctc),
         location: data.location.split(",").map((l) => l.trim()),
-        eligibility: {
-          minCgpa: parseFloat(data.minCgpa),
-          allowedBranches: selectedBranches,
-          maxActiveBacklogs: parseInt(data.maxActiveBacklogs),
-          maxTotalBacklogs: parseInt(data.maxTotalBacklogs),
-          allowPlaced: data.allowPlaced === "true",
-          minYear: parseInt(data.minYear),
-        },
+eligibility: {
+  minCgpa: parseFloat(data.minCgpa) || 0,
+  min10thMarks: parseFloat(data.min10thMarks) || 0,
+  min12thMarks: parseFloat(data.min12thMarks) || 0,
+  allowedBranches: selectedBranches,
+  maxActiveBacklogs: parseInt(data.maxActiveBacklogs) || 0,
+  maxTotalBacklogs: parseInt(data.maxTotalBacklogs) || 0,
+  allowPlaced: data.allowPlaced === true,
+  minYear: parseInt(data.minYear) || 4,
+},
         rounds: rounds.filter((r) => r.name.trim() !== ""),
       });
       toast.success("Job posted successfully!");
@@ -243,6 +245,39 @@ export default function CreateJob() {
                 {...register("minCgpa")}
               />
             </div>
+            <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Min 10th Marks (%)
+  </label>
+  <input
+    type="number"
+    step="0.1"
+    min="0"
+    max="100"
+    defaultValue={0}
+    placeholder="0 = no requirement"
+    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    {...register("min10thMarks")}
+  />
+  <p className="text-xs text-gray-400 mt-1">Set 0 if no minimum required</p>
+</div>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Min 12th Marks (%)
+  </label>
+  <input
+    type="number"
+    step="0.1"
+    min="0"
+    max="100"
+    defaultValue={0}
+    placeholder="0 = no requirement"
+    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    {...register("min12thMarks")}
+  />
+  <p className="text-xs text-gray-400 mt-1">Set 0 if no minimum required</p>
+</div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Min Year</label>
               <select
