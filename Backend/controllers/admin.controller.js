@@ -359,11 +359,11 @@ const exportApplicantsExcel = asyncHandler(async (req, res) => {
   const job = await Job.findById(req.params.id);
   if (!job) return res.status(404).json({ success: false, message: "Job not found." });
 
-  const applications = await Application.find({ job: req.params.id })
-    .populate("student", "name rollNo email phone branch cgpa activeBacklogs totalBacklogs isPlaced")
-    .sort({ appliedAt: -1 });
+const applications = await Application.find({ job: req.params.id })
+  .populate("student", "name rollNo email phone branch cgpa activeBacklogs totalBacklogs isPlaced resumeUrl")
+  .sort({ appliedAt: -1 });
 
-  const rows = applications.map((app, i) => ({
+const rows = applications.map((app, i) => ({
   "#": i + 1,
   "Name": app.student?.name || "N/A",
   "Roll No": app.student?.rollNo || "N/A",
@@ -376,14 +376,16 @@ const exportApplicantsExcel = asyncHandler(async (req, res) => {
   "Status": app.status,
   "Applied At": new Date(app.appliedAt).toLocaleDateString("en-IN"),
   "Remarks": app.adminRemarks || "",
-  "Resume Link": app.student?.resumeUrl || "Not uploaded",
+  "Resume Link": app.student?.resumeUrl
+    ? app.student.resumeUrl.replace("/raw/upload/", "/image/upload/")
+    : "Not uploaded",
 }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Applicants");
 
- ws["!cols"] = [
+ws["!cols"] = [
   { wch: 4 },  // #
   { wch: 25 }, // Name
   { wch: 14 }, // Roll No
@@ -396,7 +398,7 @@ const exportApplicantsExcel = asyncHandler(async (req, res) => {
   { wch: 14 }, // Status
   { wch: 14 }, // Applied At
   { wch: 30 }, // Remarks
-  { wch: 60 }, // Resume Link
+  { wch: 80 }, // Resume Link
 ];
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
