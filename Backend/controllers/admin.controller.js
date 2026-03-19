@@ -1,5 +1,13 @@
 const Job = require("../models/Job.model");
 const Student = require("../models/Student.model");
+const {
+  withCache,
+  invalidateCache,
+  invalidateAll,
+  CACHE_KEYS,
+  TTL,
+  getPerformanceStats,
+} = require("../utils/cache.util");
 const { asyncHandler } = require("../middleware/error.middleware");
 //const Job = require("../models/Job.model");
 //const Student = require("../models/Student.model");
@@ -108,6 +116,9 @@ const createJob = asyncHandler(async (req, res) => {
   } catch (err) {
     console.error("❌ Failed to send job notification:", err.message);
   }
+    // Invalidate cache so new job appears immediately
+  invalidateCache(CACHE_KEYS.ALL_JOBS, CACHE_KEYS.OPEN_JOBS, CACHE_KEYS.STATS);
+
 
   res.status(201).json({
     success: true,
@@ -123,130 +134,113 @@ const updateJob = asyncHandler(async (req, res) => {
     runValidators: true,
   });
   if (!job) return res.status(404).json({ success: false, message: "Job not found." });
+  invalidateCache(CACHE_KEYS.ALL_JOBS, CACHE_KEYS.STATS);
   res.json({ success: true, data: job });
 });
 
 // Close a job
 const deleteJob = asyncHandler(async (req, res) => {
   await Job.findByIdAndUpdate(req.params.id, { status: "closed" });
+  invalidateCache(CACHE_KEYS.ALL_JOBS, CACHE_KEYS.STATS);
   res.json({ success: true, message: "Job closed successfully." });
 });
 
 // Get all jobs (admin view)
 const getAllJobs = asyncHandler(async (req, res) => {
-  const jobs = await Job.find().sort({ createdAt: -1 });
-  res.json({ success: true, count: jobs.length, data: jobs });
+  const data = await withCache(CACHE_KEYS.ALL_JOBS, TTL.JOBS, async () => {
+    return await Job.find().sort({ createdAt: -1 });
+  });
+  res.json({ success: true, count: data.length, data });
 });
 
 // Dashboard stats
 const getStats = asyncHandler(async (req, res) => {
-  const Application = require("../models/Application.model");
+  const data = await withCache(CACHE_KEYS.STATS, TTL.STATS, async () => {
+    const [totalStudents, placedStudents, totalJobs, totalApplications] = await Promise.all([
+      Student.countDocuments(),
+      Student.countDocuments({ isPlaced: true }),
+      Job.countDocuments(),
+      Application.countDocuments(),
+    ]);
 
-  const [totalStudents, placedStudents, totalJobs, totalApplications] = await Promise.all([
-    Student.countDocuments(),
-    Student.countDocuments({ isPlaced: true }),
-    Job.countDocuments(),
-    Application.countDocuments(),
-  ]);
-
-  // Branch wise stats
-  const branchStats = await Student.aggregate([
-    {
-      $group: {
-        _id: "$branch",
-        total: { $sum: 1 },
-        placed: { $sum: { $cond: ["$isPlaced", 1, 0] } },
-      },
-    },
-    { $sort: { total: -1 } },
-  ]);
-
-  // Package stats — avg, max, median
-  const placedStudentsData = await Student.find(
-    { isPlaced: true, ctcOffered: { $exists: true, $ne: null } },
-    { ctcOffered: 1 }
-  );
-
-  const packages = placedStudentsData
-    .map((s) => s.ctcOffered)
-    .sort((a, b) => a - b);
-
-  const avgPackage = packages.length
-    ? (packages.reduce((a, b) => a + b, 0) / packages.length).toFixed(2)
-    : 0;
-
-  const maxPackage = packages.length ? packages[packages.length - 1] : 0;
-  const minPackage = packages.length ? packages[0] : 0;
-
-  // Median calculation
-  let medianPackage = 0;
-  if (packages.length > 0) {
-    const mid = Math.floor(packages.length / 2);
-    medianPackage =
-      packages.length % 2 !== 0
-        ? packages[mid]
-        : ((packages[mid - 1] + packages[mid]) / 2).toFixed(2);
-  }
-
-  // Companies visited vs hired
-  const companiesVisited = await Job.countDocuments();
-  const companiesHired = await Job.countDocuments({ totalSelected: { $gt: 0 } });
-
-  // Top hiring companies
-  const topCompanies = await Job.find({ totalSelected: { $gt: 0 } })
-    .sort({ totalSelected: -1 })
-    .limit(5)
-    .select("companyName jobRole ctc totalSelected totalApplicants");
-
-  // Month wise placement trend (current year)
-  const currentYear = new Date().getFullYear();
-  const monthlyTrend = await Student.aggregate([
-    {
-      $match: {
-        isPlaced: true,
-        updatedAt: {
-          $gte: new Date(`${currentYear}-01-01`),
-          $lte: new Date(`${currentYear}-12-31`),
+    const branchStats = await Student.aggregate([
+      {
+        $group: {
+          _id: "$branch",
+          total: { $sum: 1 },
+          placed: { $sum: { $cond: ["$isPlaced", 1, 0] } },
         },
       },
-    },
-    {
-      $group: {
-        _id: { $month: "$updatedAt" },
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { _id: 1 } },
-  ]);
+      { $sort: { total: -1 } },
+    ]);
 
-  // Package distribution buckets
-  const packageDistribution = await Student.aggregate([
-    { $match: { isPlaced: true, ctcOffered: { $exists: true, $ne: null } } },
-    {
-      $bucket: {
-        groupBy: "$ctcOffered",
-        boundaries: [0, 3, 5, 8, 12, 20, 50],
-        default: "50+ LPA",
-        output: { count: { $sum: 1 } },
-      },
-    },
-  ]);
+    const placedStudentsData = await Student.find(
+      { isPlaced: true, ctcOffered: { $exists: true, $ne: null } },
+      { ctcOffered: 1 }
+    );
 
-  // Year wise stats
-  const yearStats = await Student.aggregate([
-    {
-      $group: {
-        _id: "$year",
-        total: { $sum: 1 },
-        placed: { $sum: { $cond: ["$isPlaced", 1, 0] } },
-      },
-    },
-    { $sort: { _id: 1 } },
-  ]);
+    const packages = placedStudentsData.map((s) => s.ctcOffered).sort((a, b) => a - b);
+    const avgPackage = packages.length
+      ? (packages.reduce((a, b) => a + b, 0) / packages.length).toFixed(2)
+      : 0;
+    const maxPackage = packages.length ? packages[packages.length - 1] : 0;
+    const minPackage = packages.length ? packages[0] : 0;
 
-  res.json({
-    success: true,
-    data: {
+    let medianPackage = 0;
+    if (packages.length > 0) {
+      const mid = Math.floor(packages.length / 2);
+      medianPackage = packages.length % 2 !== 0
+        ? packages[mid]
+        : ((packages[mid - 1] + packages[mid]) / 2).toFixed(2);
+    }
+
+    const companiesVisited = await Job.countDocuments();
+    const companiesHired = await Job.countDocuments({ totalSelected: { $gt: 0 } });
+
+    const topCompanies = await Job.find({ totalSelected: { $gt: 0 } })
+      .sort({ totalSelected: -1 })
+      .limit(5)
+      .select("companyName jobRole ctc totalSelected totalApplicants");
+
+    const currentYear = new Date().getFullYear();
+    const monthlyTrend = await Student.aggregate([
+      {
+        $match: {
+          isPlaced: true,
+          updatedAt: {
+            $gte: new Date(`${currentYear}-01-01`),
+            $lte: new Date(`${currentYear}-12-31`),
+          },
+        },
+      },
+      { $group: { _id: { $month: "$updatedAt" }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const packageDistribution = await Student.aggregate([
+      { $match: { isPlaced: true, ctcOffered: { $exists: true, $ne: null } } },
+      {
+        $bucket: {
+          groupBy: "$ctcOffered",
+          boundaries: [0, 3, 5, 8, 12, 20, 50],
+          default: "50+ LPA",
+          output: { count: { $sum: 1 } },
+        },
+      },
+    ]);
+
+    const yearStats = await Student.aggregate([
+      {
+        $group: {
+          _id: "$year",
+          total: { $sum: 1 },
+          placed: { $sum: { $cond: ["$isPlaced", 1, 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    return {
       overview: {
         totalStudents,
         placedStudents,
@@ -259,19 +253,16 @@ const getStats = asyncHandler(async (req, res) => {
         companiesVisited,
         companiesHired,
       },
-      packageStats: {
-        avgPackage,
-        maxPackage,
-        minPackage,
-        medianPackage,
-      },
+      packageStats: { avgPackage, maxPackage, minPackage, medianPackage },
       branchStats,
       yearStats,
       monthlyTrend,
       packageDistribution,
       topCompanies,
-    },
+    };
   });
+
+  res.json({ success: true, data });
 });
 // @desc    Get all applicants for a job
 // @route   GET /api/admin/jobs/:id/applicants
@@ -349,7 +340,7 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
       `,
     });
   }
-
+  invalidateCache(CACHE_KEYS.STATS);
   res.json({ success: true, message: "Status updated.", data: application });
 });
 
@@ -413,8 +404,17 @@ ws["!cols"] = [
 // @route   GET /api/admin/students
 const getAllStudents = asyncHandler(async (req, res) => {
   const { branch, year, isPlaced, minCgpa, search } = req.query;
-  const query = {};
 
+  // Only use cache when no filters applied
+  if (!branch && !year && !isPlaced && !minCgpa && !search) {
+    const data = await withCache(CACHE_KEYS.ALL_STUDENTS, TTL.STUDENTS, async () => {
+      return await Student.find().sort({ name: 1 });
+    });
+    return res.json({ success: true, count: data.length, data });
+  }
+
+  // With filters — skip cache
+  const query = {};
   if (branch) query.branch = branch;
   if (year) query.year = parseInt(year);
   if (isPlaced !== undefined) query.isPlaced = isPlaced === "true";
@@ -460,7 +460,7 @@ const verifyStudent = asyncHandler(async (req, res) => {
       </div>
     `,
   });
-
+  invalidateCache(CACHE_KEYS.ALL_STUDENTS, CACHE_KEYS.STATS);
   res.json({ success: true, message: "Student verified. Email sent.", data: student });
 });
 
@@ -524,7 +524,7 @@ const blockStudent = asyncHandler(async (req, res) => {
       </div>
     `,
   });
-
+  invalidateCache(CACHE_KEYS.ALL_STUDENTS);
   res.json({
     success: true,
     message: `${student.name} has been debarred.`,
@@ -561,7 +561,7 @@ const unblockStudent = asyncHandler(async (req, res) => {
       </div>
     `,
   });
-
+  invalidateCache(CACHE_KEYS.ALL_STUDENTS);
   res.json({
     success: true,
     message: `${student.name} has been reinstated.`,

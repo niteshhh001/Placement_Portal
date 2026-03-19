@@ -1,7 +1,7 @@
 const Job = require("../models/Job.model");
 const Application = require("../models/Application.model");
 const { asyncHandler } = require("../middleware/error.middleware");
-
+const { withCache, invalidateCache, CACHE_KEYS, TTL } = require("../utils/cache.util");
 // ── Eligibility Engine ────────────────────────────────────────────────────────
 const checkEligibility = (student, job) => {
   const { eligibility } = job;
@@ -9,6 +9,32 @@ const checkEligibility = (student, job) => {
 
   if (student.cgpa < eligibility.minCgpa)
     reasons.push(`CGPA must be ≥ ${eligibility.minCgpa} (yours: ${student.cgpa})`);
+
+  // Check 10th marks
+  if (eligibility.min10thMarks > 0) {
+    const tenth = student.education?.find((e) => e.level === "10th");
+    if (!tenth) {
+      reasons.push(`10th marks required (min ${eligibility.min10thMarks}%) — please update your profile`);
+    } else {
+      const marks = tenth.percentage || tenth.cgpa * 10 || 0;
+      if (marks < eligibility.min10thMarks) {
+        reasons.push(`10th marks must be ≥ ${eligibility.min10thMarks}% (yours: ${marks}%)`);
+      }
+    }
+  }
+
+  // Check 12th marks
+  if (eligibility.min12thMarks > 0) {
+    const twelfth = student.education?.find((e) => e.level === "12th");
+    if (!twelfth) {
+      reasons.push(`12th marks required (min ${eligibility.min12thMarks}%) — please update your profile`);
+    } else {
+      const marks = twelfth.percentage || twelfth.cgpa * 10 || 0;
+      if (marks < eligibility.min12thMarks) {
+        reasons.push(`12th marks must be ≥ ${eligibility.min12thMarks}% (yours: ${marks}%)`);
+      }
+    }
+  }
 
   const branchAllowed =
     eligibility.allowedBranches.includes("ALL") ||
@@ -37,13 +63,19 @@ const checkEligibility = (student, job) => {
 const getJobs = asyncHandler(async (req, res) => {
   const { status = "open", sector, search } = req.query;
 
-  const query = { status };
-  if (sector) query.sector = sector;
-  if (search) query.companyName = { $regex: search, $options: "i" };
+  // Only cache unfiltered open jobs
+  let jobs;
+  if (!sector && !search && status === "open") {
+    jobs = await withCache(CACHE_KEYS.OPEN_JOBS, TTL.JOBS, async () => {
+      return await Job.find({ status: "open" }).sort({ createdAt: -1 });
+    });
+  } else {
+    const query = { status };
+    if (sector) query.sector = sector;
+    if (search) query.companyName = { $regex: search, $options: "i" };
+    jobs = await Job.find(query).sort({ createdAt: -1 });
+  }
 
-  const jobs = await Job.find(query).sort({ createdAt: -1 });
-
-  // Attach eligibility flag for each job
   const student = req.user;
   const jobsWithEligibility = jobs.map((job) => {
     const { eligible, reasons } = checkEligibility(student, job);
@@ -112,7 +144,8 @@ const applyToJob = asyncHandler(async (req, res) => {
 
   // Increment applicant count
   await Job.findByIdAndUpdate(job._id, { $inc: { totalApplicants: 1 } });
-
+  // Invalidate cache so applicant count updates immediately
+invalidateCache(CACHE_KEYS.OPEN_JOBS, CACHE_KEYS.ALL_JOBS);
   res.status(201).json({ success: true, message: "Application submitted!", data: application });
 });
 
