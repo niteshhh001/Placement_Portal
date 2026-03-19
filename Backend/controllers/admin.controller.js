@@ -8,6 +8,8 @@ const {
   TTL,
   getPerformanceStats,
 } = require("../utils/cache.util");
+const AuditLog = require("../models/AuditLog.model");
+
 const { asyncHandler } = require("../middleware/error.middleware");
 //const Job = require("../models/Job.model");
 //const Student = require("../models/Student.model");
@@ -568,10 +570,281 @@ const unblockStudent = asyncHandler(async (req, res) => {
     data: student,
   });
 });
+const bulkUpdateStatus = asyncHandler(async (req, res) => {
+  const {
+    status,
+    rollNumbers,
+    isDryRun = false,
+    fileName = "unknown",
+  } = req.body;
+
+  if (!rollNumbers || !Array.isArray(rollNumbers) || rollNumbers.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide roll numbers array.",
+    });
+  }
+
+  // Normalize roll numbers
+  const normalizeRollNo = (r) => {
+    return String(r)
+      .toUpperCase()
+      .trim()
+      .replace(/[-_\s\/]/g, "")  // remove dashes, underscores, spaces, slashes
+      .replace(/^0+/, "");        // remove leading zeros
+  };
+
+  const normalizedInput = rollNumbers.map(normalizeRollNo);
+
+  // Remove duplicates
+  const uniqueInput = [...new Set(normalizedInput)];
+  const duplicates = normalizedInput.filter(
+    (r, i) => normalizedInput.indexOf(r) !== i
+  );
+
+  // Find all students
+  const allStudents = await Student.find({}, { rollNo: 1, name: 1, email: 1 });
+
+  // Match with normalization
+  const matchedStudents = allStudents.filter((s) =>
+    uniqueInput.includes(normalizeRollNo(s.rollNo))
+  );
+
+  const matchedRollNos = matchedStudents.map((s) => normalizeRollNo(s.rollNo));
+  const notFound = uniqueInput.filter((r) => !matchedRollNos.includes(r));
+
+  if (matchedStudents.length === 0) {
+    return res.status(404).json({
+      success: false,
+      message: "No students found with provided roll numbers.",
+      data: {
+        totalProvided: rollNumbers.length,
+        totalMatched: 0,
+        notFound: uniqueInput,
+      },
+    });
+  }
+
+  const studentIds = matchedStudents.map((s) => s._id);
+
+  // Find applications for this job
+  const applications = await Application.find({
+    job: req.params.id,
+    student: { $in: studentIds },
+  }).populate("student job");
+
+  // Find already same status (skip these)
+  const alreadySameStatus = applications
+    .filter((app) => app.status === status)
+    .map((app) => app.student?.rollNo);
+
+  // Applications that need updating
+  const toUpdate = applications.filter((app) => app.status !== status);
+
+  // DRY RUN — return preview without updating
+  if (isDryRun) {
+    return res.json({
+      success: true,
+      isDryRun: true,
+      message: "Dry run complete — no changes made.",
+      preview: {
+        totalProvided: rollNumbers.length,
+        uniqueProvided: uniqueInput.length,
+        duplicatesInFile: duplicates.length,
+        duplicates,
+        totalMatched: matchedStudents.length,
+        notFound: notFound.length,
+        notFoundList: notFound,
+        alreadySameStatus: alreadySameStatus.length,
+        alreadySameStatusList: alreadySameStatus,
+        willBeUpdated: toUpdate.length,
+        students: toUpdate.map((app) => ({
+          name: app.student?.name,
+          rollNo: app.student?.rollNo,
+          currentStatus: app.status,
+          newStatus: status,
+        })),
+      },
+    });
+  }
+
+  // ACTUAL UPDATE — process in batches
+  const updated = [];
+  const errors = [];
+
+  for (const app of toUpdate) {
+    try {
+      app.status = status;
+      await app.save();
+
+      // Send email only if status actually changed
+      if (status === "shortlisted") {
+        await sendEmail({
+          to: app.student.email,
+          subject: `Eligible for Online Assessment — ${app.job.companyName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">Congratulations! 🎉</h2>
+              <p>Dear ${app.student.name},</p>
+              <p>You are <strong>eligible for the Online Assessment</strong> at 
+              <strong>${app.job.companyName}</strong>.</p>
+              <div style="background: #F3F4F6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <p style="margin: 0;"><strong>Role:</strong> ${app.job.jobRole}</p>
+                <p style="margin: 8px 0 0;"><strong>CTC:</strong> ₹${app.job.ctc} LPA</p>
+              </div>
+              <p>Please check the placement portal for further updates and exam details.</p>
+            </div>
+          `,
+        });
+      }
+
+      if (status === "aptitude") {
+        await sendEmail({
+          to: app.student.email,
+          subject: `Aptitude Test Cleared — ${app.job.companyName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">Aptitude Test Cleared! 🎉</h2>
+              <p>Dear ${app.student.name},</p>
+              <p>You have cleared the <strong>Aptitude Test</strong> at 
+              <strong>${app.job.companyName}</strong> and are now eligible for the next round.</p>
+              <p>Please check the portal for further updates.</p>
+            </div>
+          `,
+        });
+      }
+
+      if (status === "technical") {
+        await sendEmail({
+          to: app.student.email,
+          subject: `Eligible for Technical Interview — ${app.job.companyName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">Eligible for Technical Interview! 🎉</h2>
+              <p>Dear ${app.student.name},</p>
+              <p>You are <strong>eligible for the Technical Interview</strong> at 
+              <strong>${app.job.companyName}</strong>.</p>
+              <p>Please check the portal for interview schedule and details.</p>
+            </div>
+          `,
+        });
+      }
+
+      if (status === "hr") {
+        await sendEmail({
+          to: app.student.email,
+          subject: `Eligible for HR Interview — ${app.job.companyName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">Eligible for HR Interview! 🎉</h2>
+              <p>Dear ${app.student.name},</p>
+              <p>You are <strong>eligible for the HR Interview</strong> at 
+              <strong>${app.job.companyName}</strong>.</p>
+              <p>Please check the portal for interview schedule and details.</p>
+            </div>
+          `,
+        });
+      }
+
+      if (status === "selected") {
+        await Student.findByIdAndUpdate(app.student._id, {
+          isPlaced: true,
+          placedAt: app.job._id,
+          placedCompany: app.job.companyName,
+          ctcOffered: app.job.ctc,
+        });
+        await Job.findByIdAndUpdate(app.job._id, { $inc: { totalSelected: 1 } });
+
+        await sendEmail({
+          to: app.student.email,
+          subject: `Finally Selected at ${app.job.companyName}! 🎉`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+              <h2 style="color: #16A34A;">Congratulations! You are Finally Selected! 🎉</h2>
+              <p>Dear ${app.student.name},</p>
+              <p>You have been <strong>finally selected</strong> for 
+              <strong>${app.job.jobRole}</strong> at 
+              <strong>${app.job.companyName}</strong>.</p>
+              <div style="background: #F0FDF4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <p style="margin: 0;"><strong>CTC:</strong> ₹${app.job.ctc} LPA</p>
+              </div>
+              <p>The placement cell will share the offer letter shortly. Congratulations!</p>
+            </div>
+          `,
+        });
+      }
+
+      if (status === "rejected") {
+        await sendEmail({
+          to: app.student.email,
+          subject: `Update on your application — ${app.job.companyName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+              <h2 style="color: #DC2626;">Application Update</h2>
+              <p>Dear ${app.student.name},</p>
+              <p>We regret to inform you that you were not selected for 
+              <strong>${app.job.jobRole}</strong> at 
+              <strong>${app.job.companyName}</strong>.</p>
+              <p>Keep applying — better opportunities await!</p>
+            </div>
+          `,
+        });
+      }
+
+      updated.push(app.student?.rollNo);
+    } catch (err) {
+      errors.push(`${app.student?.rollNo}: ${err.message}`);
+    }
+  }
+
+  // Save audit log
+  try {
+    const job = await Job.findById(req.params.id).select("companyName");
+    await AuditLog.create({
+      action: "bulk_status_update",
+      performedBy: req.user._id,
+      performedByName: req.user.name,
+      job: req.params.id,
+      jobName: job?.companyName,
+      status,
+      fileName,
+      totalProvided: rollNumbers.length,
+      totalMatched: matchedStudents.length,
+      totalUpdated: updated.length,
+      totalSkipped: alreadySameStatus.length,
+      notFound,
+      duplicates,
+      alreadySameStatus,
+      errors,
+      isDryRun: false,
+    });
+  } catch (err) {
+    console.error("Audit log failed:", err.message);
+  }
+
+  // Invalidate cache
+  invalidateCache(CACHE_KEYS.STATS);
+
+  res.json({
+    success: true,
+    message: `${updated.length} students updated successfully!`,
+    data: {
+      totalProvided: rollNumbers.length,
+      uniqueProvided: uniqueInput.length,
+      duplicatesInFile: duplicates.length,
+      duplicates,
+      totalMatched: matchedStudents.length,
+      totalUpdated: updated.length,
+      totalSkipped: alreadySameStatus.length,
+      notFound,
+      errors,
+    },
+  });
+});
 
 module.exports = {
   createJob, updateJob, deleteJob, getAllJobs,
   getApplicants, updateApplicationStatus, exportApplicantsExcel,
   getAllStudents, verifyStudent, blockStudent, unblockStudent,
-  getStats, bulkNotify,
+  getStats, bulkNotify,bulkUpdateStatus,
 };

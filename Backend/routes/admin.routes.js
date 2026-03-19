@@ -10,7 +10,8 @@ const {
 const { protect, adminOnly } = require("../middleware/auth.middleware");
 const { validate, createJobSchema } = require("../middleware/validate.middleware");
 const { getPerformanceStats, invalidateAll } = require("../utils/cache.util");
-
+const AuditLog = require("../models/AuditLog.model");
+const { asyncHandler } = require("../middleware/error.middleware");
 router.use(protect, adminOnly);
 
 // Dashboard
@@ -28,6 +29,14 @@ router.delete("/cache/clear", (req, res) => {
   res.json({ success: true, message: "All cache cleared successfully." });
 });
 
+// Audit logs
+router.get("/audit-logs", asyncHandler(async (req, res) => {
+  const logs = await AuditLog.find()
+    .sort({ createdAt: -1 })
+    .limit(50);
+  res.json({ success: true, data: logs });
+}));
+
 // Job management
 router.get("/jobs", getAllJobs);
 router.post("/jobs", validate(createJobSchema), createJob);
@@ -38,7 +47,7 @@ router.delete("/jobs/:id", deleteJob);
 router.get("/jobs/:id/applicants", getApplicants);
 router.get("/jobs/:id/export", exportApplicantsExcel);
 router.patch("/applications/:id/status", updateApplicationStatus);
-//router.post("/jobs/:id/bulk-update", bulkUpdateStatus);
+router.post("/jobs/:id/bulk-update", bulkUpdateStatus);
 
 // Student management
 router.get("/students", getAllStudents);
