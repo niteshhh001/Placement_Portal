@@ -4,6 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 import ResumeViewer from "../../components/ResumeViewer";
+
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -12,8 +13,25 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [skills, setSkills] = useState([]);
   const [skillInput, setSkillInput] = useState("");
+  const [viewingResume, setViewingResume] = useState(null);
+  const [education, setEducation] = useState({
+    tenth: {
+      level: "10th",
+      institution: "",
+      board: "",
+      percentage: "",
+      passingYear: "",
+    },
+    twelfth: {
+      level: "12th",
+      institution: "",
+      board: "",
+      percentage: "",
+      passingYear: "",
+    },
+  });
+
   const { refreshUser } = useAuth();
-  const [viewingResume, setViewingResume] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
   useEffect(() => {
@@ -25,6 +43,29 @@ export default function Profile() {
       const res = await API.get("/student/profile");
       setProfile(res.data.data);
       setSkills(res.data.data.skills || []);
+
+      // Populate education state
+      const edu = res.data.data.education || [];
+      const tenth = edu.find((e) => e.level === "10th") || {};
+      const twelfth = edu.find((e) => e.level === "12th") || {};
+
+      setEducation({
+        tenth: {
+          level: "10th",
+          institution: tenth.institution || "",
+          board: tenth.board || "",
+          percentage: tenth.percentage || "",
+          passingYear: tenth.passingYear || "",
+        },
+        twelfth: {
+          level: "12th",
+          institution: twelfth.institution || "",
+          board: twelfth.board || "",
+          percentage: twelfth.percentage || "",
+          passingYear: twelfth.passingYear || "",
+        },
+      });
+
       reset({
         phone: res.data.data.phone,
         cgpa: res.data.data.cgpa,
@@ -43,7 +84,42 @@ export default function Profile() {
   const onSubmit = async (data) => {
     setSaving(true);
     try {
-      await API.patch("/student/profile", { ...data, skills });
+      // Build education array
+      const educationArray = [];
+
+      if (education.tenth.institution || education.tenth.percentage) {
+        educationArray.push({
+          level: "10th",
+          institution: education.tenth.institution,
+          board: education.tenth.board,
+          percentage: education.tenth.percentage
+            ? parseFloat(education.tenth.percentage)
+            : undefined,
+          passingYear: education.tenth.passingYear
+            ? parseInt(education.tenth.passingYear)
+            : undefined,
+        });
+      }
+
+      if (education.twelfth.institution || education.twelfth.percentage) {
+        educationArray.push({
+          level: "12th",
+          institution: education.twelfth.institution,
+          board: education.twelfth.board,
+          percentage: education.twelfth.percentage
+            ? parseFloat(education.twelfth.percentage)
+            : undefined,
+          passingYear: education.twelfth.passingYear
+            ? parseInt(education.twelfth.passingYear)
+            : undefined,
+        });
+      }
+
+      await API.patch("/student/profile", {
+        ...data,
+        skills,
+        education: educationArray,
+      });
       toast.success("Profile updated!");
       await refreshUser();
       fetchProfile();
@@ -108,9 +184,9 @@ export default function Profile() {
     setSkills(skills.filter((s) => s !== skill));
   };
 
-const openResume = (url) => {
-  setViewingResume(url);
-};
+  const openResume = (url) => {
+    setViewingResume(url);
+  };
 
   const fields = [
     profile?.name, profile?.email, profile?.phone,
@@ -308,161 +384,140 @@ const openResume = (url) => {
               ))}
             </div>
           </div>
-          {/* Education Details */}
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-3">
-    Education Details
-  </label>
-  <div className="space-y-3">
-    {/* 10th */}
-    <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-      <p className="text-sm font-medium text-gray-700">10th Standard</p>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">School Name</label>
-          <input
-            type="text"
-            placeholder="School name"
-            defaultValue={profile?.education?.find(e => e.level === "10th")?.institution || ""}
-            onChange={(e) => {
-              const edu = [...(profile?.education || [])];
-              const idx = edu.findIndex(e => e.level === "10th");
-              if (idx >= 0) edu[idx].institution = e.target.value;
-              else edu.push({ level: "10th", institution: e.target.value });
-              setProfile({ ...profile, education: edu });
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Percentage (%)</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            max="100"
-            placeholder="e.g. 92.5"
-            defaultValue={profile?.education?.find(e => e.level === "10th")?.percentage || ""}
-            onChange={(e) => {
-              const edu = [...(profile?.education || [])];
-              const idx = edu.findIndex(e => e.level === "10th");
-              if (idx >= 0) edu[idx].percentage = parseFloat(e.target.value);
-              else edu.push({ level: "10th", percentage: parseFloat(e.target.value) });
-              setProfile({ ...profile, education: edu });
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Board</label>
-          <input
-            type="text"
-            placeholder="e.g. CBSE"
-            defaultValue={profile?.education?.find(e => e.level === "10th")?.board || ""}
-            onChange={(e) => {
-              const edu = [...(profile?.education || [])];
-              const idx = edu.findIndex(e => e.level === "10th");
-              if (idx >= 0) edu[idx].board = e.target.value;
-              else edu.push({ level: "10th", board: e.target.value });
-              setProfile({ ...profile, education: edu });
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Passing Year</label>
-          <input
-            type="number"
-            placeholder="e.g. 2018"
-            defaultValue={profile?.education?.find(e => e.level === "10th")?.passingYear || ""}
-            onChange={(e) => {
-              const edu = [...(profile?.education || [])];
-              const idx = edu.findIndex(e => e.level === "10th");
-              if (idx >= 0) edu[idx].passingYear = parseInt(e.target.value);
-              else edu.push({ level: "10th", passingYear: parseInt(e.target.value) });
-              setProfile({ ...profile, education: edu });
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-      </div>
-    </div>
 
-    {/* 12th */}
-    <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-      <p className="text-sm font-medium text-gray-700">12th Standard</p>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">School Name</label>
-          <input
-            type="text"
-            placeholder="School name"
-            defaultValue={profile?.education?.find(e => e.level === "12th")?.institution || ""}
-            onChange={(e) => {
-              const edu = [...(profile?.education || [])];
-              const idx = edu.findIndex(e => e.level === "12th");
-              if (idx >= 0) edu[idx].institution = e.target.value;
-              else edu.push({ level: "12th", institution: e.target.value });
-              setProfile({ ...profile, education: edu });
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Percentage (%)</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            max="100"
-            placeholder="e.g. 88.5"
-            defaultValue={profile?.education?.find(e => e.level === "12th")?.percentage || ""}
-            onChange={(e) => {
-              const edu = [...(profile?.education || [])];
-              const idx = edu.findIndex(e => e.level === "12th");
-              if (idx >= 0) edu[idx].percentage = parseFloat(e.target.value);
-              else edu.push({ level: "12th", percentage: parseFloat(e.target.value) });
-              setProfile({ ...profile, education: edu });
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Board</label>
-          <input
-            type="text"
-            placeholder="e.g. CBSE"
-            defaultValue={profile?.education?.find(e => e.level === "12th")?.board || ""}
-            onChange={(e) => {
-              const edu = [...(profile?.education || [])];
-              const idx = edu.findIndex(e => e.level === "12th");
-              if (idx >= 0) edu[idx].board = e.target.value;
-              else edu.push({ level: "12th", board: e.target.value });
-              setProfile({ ...profile, education: edu });
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Passing Year</label>
-          <input
-            type="number"
-            placeholder="e.g. 2020"
-            defaultValue={profile?.education?.find(e => e.level === "12th")?.passingYear || ""}
-            onChange={(e) => {
-              const edu = [...(profile?.education || [])];
-              const idx = edu.findIndex(e => e.level === "12th");
-              if (idx >= 0) edu[idx].passingYear = parseInt(e.target.value);
-              else edu.push({ level: "12th", passingYear: parseInt(e.target.value) });
-              setProfile({ ...profile, education: edu });
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+          {/* Education Details */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Education Details
+            </label>
+            <div className="space-y-3">
+
+              {/* 10th */}
+              <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+                <p className="text-sm font-medium text-gray-700">10th Standard</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">School Name</label>
+                    <input
+                      type="text"
+                      placeholder="School name"
+                      value={education.tenth.institution}
+                      onChange={(e) => setEducation({
+                        ...education,
+                        tenth: { ...education.tenth, institution: e.target.value }
+                      })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Percentage (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      placeholder="e.g. 92.5"
+                      value={education.tenth.percentage}
+                      onChange={(e) => setEducation({
+                        ...education,
+                        tenth: { ...education.tenth, percentage: e.target.value }
+                      })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Board</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CBSE"
+                      value={education.tenth.board}
+                      onChange={(e) => setEducation({
+                        ...education,
+                        tenth: { ...education.tenth, board: e.target.value }
+                      })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Passing Year</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 2018"
+                      value={education.tenth.passingYear}
+                      onChange={(e) => setEducation({
+                        ...education,
+                        tenth: { ...education.tenth, passingYear: e.target.value }
+                      })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 12th */}
+              <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+                <p className="text-sm font-medium text-gray-700">12th Standard</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">School Name</label>
+                    <input
+                      type="text"
+                      placeholder="School name"
+                      value={education.twelfth.institution}
+                      onChange={(e) => setEducation({
+                        ...education,
+                        twelfth: { ...education.twelfth, institution: e.target.value }
+                      })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Percentage (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      placeholder="e.g. 88.5"
+                      value={education.twelfth.percentage}
+                      onChange={(e) => setEducation({
+                        ...education,
+                        twelfth: { ...education.twelfth, percentage: e.target.value }
+                      })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Board</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CBSE"
+                      value={education.twelfth.board}
+                      onChange={(e) => setEducation({
+                        ...education,
+                        twelfth: { ...education.twelfth, board: e.target.value }
+                      })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Passing Year</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 2020"
+                      value={education.twelfth.passingYear}
+                      onChange={(e) => setEducation({
+                        ...education,
+                        twelfth: { ...education.twelfth, passingYear: e.target.value }
+                      })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
 
           <button
             type="submit"
@@ -517,12 +572,13 @@ const openResume = (url) => {
           </label>
         )}
       </div>
+
       {viewingResume && (
-  <ResumeViewer
-    url={viewingResume}
-    onClose={() => setViewingResume(null)}
-  />
-)}
+        <ResumeViewer
+          url={viewingResume}
+          onClose={() => setViewingResume(null)}
+        />
+      )}
     </div>
   );
 }
