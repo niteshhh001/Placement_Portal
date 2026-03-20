@@ -7,27 +7,46 @@ const getProfile = asyncHandler(async (req, res) => {
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
+  const student = await Student.findById(req.user._id);
+
   const allowedFields = [
     "name", "phone", "dob", "gender",
     "cgpa", "activeBacklogs", "totalBacklogs",
     "skills", "internships", "education", "section",
   ];
 
+  // If profile is locked — only allow safe fields
+  const lockedAllowedFields = ["name", "phone", "skills", "gender", "section"];
+
+  const fieldsToUpdate = student.isProfileLocked ? lockedAllowedFields : allowedFields;
+
   const updates = {};
-  allowedFields.forEach((field) => {
+  fieldsToUpdate.forEach((field) => {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
   });
 
-  const student = await Student.findByIdAndUpdate(
+  // If locked and trying to update restricted fields — warn
+  if (student.isProfileLocked) {
+    const restrictedAttempts = ["cgpa", "activeBacklogs", "totalBacklogs", "education"]
+      .filter((f) => req.body[f] !== undefined);
+    if (restrictedAttempts.length > 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Your profile is locked. You cannot update academic details. Please contact the placement cell.",
+      });
+    }
+  }
+
+  const updatedStudent = await Student.findByIdAndUpdate(
     req.user._id,
     updates,
     { new: true, runValidators: true }
   );
 
-  student.checkProfileComplete();
-  await student.save();
+  updatedStudent.checkProfileComplete();
+  await updatedStudent.save();
 
-  res.json({ success: true, message: "Profile updated.", data: student });
+  res.json({ success: true, message: "Profile updated.", data: updatedStudent });
 });
 
 const uploadResume = asyncHandler(async (req, res) => {

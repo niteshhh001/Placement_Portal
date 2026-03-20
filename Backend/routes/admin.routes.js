@@ -1,10 +1,12 @@
 const express = require("express");
 const router = express.Router();
+
 const {
   createJob, updateJob, deleteJob, getAllJobs,
   getApplicants, updateApplicationStatus, exportApplicantsExcel,
   bulkUpdateStatus,
-  getAllStudents, verifyStudent, blockStudent, unblockStudent,
+  getAllStudents, getStudentProfile, updateStudentProfile, lockStudentProfile,
+  verifyStudent, blockStudent, unblockStudent,
   getStats, bulkNotify,
 } = require("../controllers/admin.controller");
 const { protect, adminOnly } = require("../middleware/auth.middleware");
@@ -57,5 +59,9 @@ router.patch("/students/:id/unblock", unblockStudent);
 
 // Notifications
 router.post("/notify", bulkNotify);
+
+router.get("/students/:id", getStudentProfile);
+router.patch("/students/:id/profile", updateStudentProfile);
+router.patch("/students/:id/lock", lockStudentProfile);
 
 module.exports = router;

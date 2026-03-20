@@ -894,9 +894,101 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get single student full profile
+// @route   GET /api/admin/students/:id
+const getStudentProfile = asyncHandler(async (req, res) => {
+  const student = await Student.findById(req.params.id).select("-password");
+  if (!student) {
+    return res.status(404).json({ success: false, message: "Student not found." });
+  }
+  res.json({ success: true, data: student });
+});
+
+// @desc    Admin update student profile
+// @route   PATCH /api/admin/students/:id/profile
+const updateStudentProfile = asyncHandler(async (req, res) => {
+  const allowedFields = [
+    "name", "phone", "cgpa", "activeBacklogs", "totalBacklogs",
+    "branch", "year", "section", "gender", "education", "skills",
+  ];
+
+  const updates = {};
+  allowedFields.forEach((field) => {
+    if (req.body[field] !== undefined) updates[field] = req.body[field];
+  });
+
+  const student = await Student.findByIdAndUpdate(
+    req.params.id,
+    updates,
+    { new: true, runValidators: true }
+  ).select("-password");
+
+  if (!student) {
+    return res.status(404).json({ success: false, message: "Student not found." });
+  }
+
+  // Recalculate profile completeness
+  student.checkProfileComplete();
+  await student.save();
+
+  // Invalidate cache
+  invalidateCache(CACHE_KEYS.ALL_STUDENTS, "all_students_p1", "all_students_p2");
+
+  res.json({ success: true, message: "Student profile updated.", data: student });
+});
+
+// @desc    Lock/unlock student profile
+// @route   PATCH /api/admin/students/:id/lock
+const lockStudentProfile = asyncHandler(async (req, res) => {
+  const { lock } = req.body;
+
+  const student = await Student.findByIdAndUpdate(
+    req.params.id,
+    { isProfileLocked: lock },
+    { new: true }
+  ).select("-password");
+
+  if (!student) {
+    return res.status(404).json({ success: false, message: "Student not found." });
+  }
+
+  invalidateCache(CACHE_KEYS.ALL_STUDENTS, "all_students_p1");
+
+  // Send email to student
+  await sendEmail({
+    to: student.email,
+    subject: lock
+      ? "Your profile has been locked — Placement Portal"
+      : "Your profile has been unlocked — Placement Portal",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+        <h2 style="color: ${lock ? "#DC2626" : "#16A34A"};">
+          Profile ${lock ? "Locked 🔒" : "Unlocked 🔓"}
+        </h2>
+        <p>Dear ${student.name},</p>
+        ${lock
+          ? `<p>Your placement portal profile has been <strong>locked</strong> by the placement cell.</p>
+             <p>You can still update your <strong>resume, photo, name and skills</strong> but academic details like CGPA, 10th and 12th marks cannot be changed.</p>`
+          : `<p>Your placement portal profile has been <strong>unlocked</strong> by the placement cell.</p>
+             <p>You can now update all your profile details.</p>`
+        }
+        <p>If you have any questions, please contact the placement cell.</p>
+      </div>
+    `,
+  });
+
+  res.json({
+    success: true,
+    message: `Profile ${lock ? "locked" : "unlocked"} successfully.`,
+    data: student,
+  });
+});
+
 module.exports = {
   createJob, updateJob, deleteJob, getAllJobs,
   getApplicants, updateApplicationStatus, exportApplicantsExcel,
-  getAllStudents, verifyStudent, blockStudent, unblockStudent,
-  getStats, bulkNotify,bulkUpdateStatus,
+  bulkUpdateStatus,
+  getAllStudents, getStudentProfile, updateStudentProfile, lockStudentProfile,
+  verifyStudent, blockStudent, unblockStudent,
+  getStats, bulkNotify,
 };
