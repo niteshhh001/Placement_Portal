@@ -61,20 +61,41 @@ const checkEligibility = (student, job) => {
 // @route   GET /api/jobs
 // @access  Private (student)
 const getJobs = asyncHandler(async (req, res) => {
-  const { status = "open", sector, search } = req.query;
+  const { status = "open", sector, search, page = 1, limit = 20 } = req.query;
 
-  // Only cache unfiltered open jobs
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const skip = (pageNum - 1) * limitNum;
+
+  let query = { status };
+  if (sector) query.sector = sector;
+  if (search) query.companyName = { $regex: search, $options: "i" };
+
+  const total = await Job.countDocuments(query);
+
   let jobs;
   if (!sector && !search && status === "open") {
     jobs = await withCache(CACHE_KEYS.OPEN_JOBS, TTL.JOBS, async () => {
       return await Job.find({ status: "open" }).sort({ createdAt: -1 });
     });
-  } else {
-    const query = { status };
-    if (sector) query.sector = sector;
-    if (search) query.companyName = { $regex: search, $options: "i" };
-    jobs = await Job.find(query).sort({ createdAt: -1 });
+    // Apply pagination on cached results
+    const paginated = jobs.slice(skip, skip + limitNum);
+    const student = req.user;
+    const jobsWithEligibility = paginated.map((job) => {
+      const { eligible, reasons } = checkEligibility(student, job);
+      return { ...job.toObject(), eligible, ineligibilityReasons: reasons };
+    });
+    return res.json({
+      success: true,
+      count: paginated.length,
+      total: jobs.length,
+      page: pageNum,
+      totalPages: Math.ceil(jobs.length / limitNum),
+      data: jobsWithEligibility,
+    });
   }
+
+  jobs = await Job.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum);
 
   const student = req.user;
   const jobsWithEligibility = jobs.map((job) => {
@@ -82,7 +103,14 @@ const getJobs = asyncHandler(async (req, res) => {
     return { ...job.toObject(), eligible, ineligibilityReasons: reasons };
   });
 
-  res.json({ success: true, count: jobs.length, data: jobsWithEligibility });
+  res.json({
+    success: true,
+    count: jobs.length,
+    total,
+    page: pageNum,
+    totalPages: Math.ceil(total / limitNum),
+    data: jobsWithEligibility,
+  });
 });
 
 // @desc    Get single job detail
