@@ -40,6 +40,7 @@ const studentSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: false },
     isBlocked: { type: Boolean, default: false },
     blockReason: { type: String, default: "" },
+    isProfileLocked: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
