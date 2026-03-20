@@ -3,10 +3,28 @@ const Job = require("../models/Job.model");
 const { asyncHandler } = require("../middleware/error.middleware");
 
 const getMyApplications = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const skip = (pageNum - 1) * limitNum;
+
+  const total = await Application.countDocuments({ student: req.user._id });
+
   const applications = await Application.find({ student: req.user._id })
     .populate("job", "companyName jobRole ctc status driveDate rounds companyLogo location applicationDeadline")
-    .sort({ appliedAt: -1 });
-  res.json({ success: true, count: applications.length, data: applications });
+    .sort({ appliedAt: -1 })
+    .skip(skip)
+    .limit(limitNum);
+
+  res.json({
+    success: true,
+    count: applications.length,
+    total,
+    page: pageNum,
+    totalPages: Math.ceil(total / limitNum),
+    data: applications,
+  });
 });
 
 const getApplicationById = asyncHandler(async (req, res) => {

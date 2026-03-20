@@ -4,6 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import API from "../../api/axios";
 import ResumeViewer from "../../components/ResumeViewer";
+import Pagination from "../../components/Pagination";
 
 const statusOptions = [
   "applied", "shortlisted", "aptitude", "gd",
@@ -88,6 +89,11 @@ export default function Applicants() {
   const [remarks, setRemarks] = useState({});
   const [viewingResume, setViewingResume] = useState(null);
 
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const LIMIT = 20;
+
   // Bulk update states
   const [showBulkUpdate, setShowBulkUpdate] = useState(false);
   const [bulkStatus, setBulkStatus] = useState("shortlisted");
@@ -98,25 +104,34 @@ export default function Applicants() {
   const [showPreview, setShowPreview] = useState(false);
   const [updateResult, setUpdateResult] = useState(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
+useEffect(() => {
+  fetchData();
+}, [id, page, filterStatus, filterBranch]);
 
-  const fetchData = async () => {
-    try {
-      const [applicantsRes, jobRes] = await Promise.all([
-        API.get(`/admin/jobs/${id}/applicants`),
-        API.get(`/admin/jobs`),
-      ]);
-      setApplicants(applicantsRes.data.data);
-      const foundJob = jobRes.data.data.find((j) => j._id === id);
-      setJob(foundJob);
-    } catch (err) {
-      toast.error("Failed to load applicants");
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchData = async () => {
+  try {
+    const params = new URLSearchParams({
+      page,
+      limit: LIMIT,
+      ...(filterStatus && { status: filterStatus }),
+      ...(filterBranch && { branch: filterBranch }),
+    });
+
+    const [applicantsRes, jobRes] = await Promise.all([
+      API.get(`/admin/jobs/${id}/applicants?${params}`),
+      API.get(`/admin/jobs`),
+    ]);
+    setApplicants(applicantsRes.data.data);
+    setTotal(applicantsRes.data.total);
+    setTotalPages(applicantsRes.data.totalPages);
+    const foundJob = jobRes.data.data.find((j) => j._id === id);
+    setJob(foundJob);
+  } catch (err) {
+    toast.error("Failed to load applicants");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const updateStatus = async (applicationId, status) => {
     setUpdating(applicationId);
@@ -239,11 +254,7 @@ export default function Applicants() {
     setBulkStatus("shortlisted");
   };
 
-  const filtered = applicants.filter((a) => {
-    const matchStatus = !filterStatus || a.status === filterStatus;
-    const matchBranch = !filterBranch || a.student?.branch === filterBranch;
-    return matchStatus && matchBranch;
-  });
+
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -289,32 +300,32 @@ export default function Applicants() {
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
         <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="">All Statuses</option>
-          {statusOptions.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <select
-          value={filterBranch}
-          onChange={(e) => setFilterBranch(e.target.value)}
-          className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="">All Branches</option>
-          {["CSE", "IT", "ECE", "EEE", "ME", "CE", "CHEM", "OTHER"].map((b) => (
-            <option key={b} value={b}>{b}</option>
-          ))}
-        </select>
-        <span className="text-sm text-gray-500 self-center">
-          Showing {filtered.length} of {applicants.length}
-        </span>
+  value={filterStatus}
+  onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+  className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+>
+  <option value="">All Statuses</option>
+  {statusOptions.map((s) => (
+    <option key={s} value={s}>{s}</option>
+  ))}
+</select>
+<select
+  value={filterBranch}
+  onChange={(e) => { setFilterBranch(e.target.value); setPage(1); }}
+  className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+>
+  <option value="">All Branches</option>
+  {["CSE", "IT", "ECE", "EEE", "ME", "CE", "CHEM", "OTHER"].map((b) => (
+    <option key={b} value={b}>{b}</option>
+  ))}
+</select>
+<span className="text-sm text-gray-500 self-center">
+  Showing {applicants.length} of {total}
+</span>
       </div>
 
       {/* Applicants Table */}
-      {filtered.length === 0 ? (
+      {applicants.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <p className="text-gray-400 text-sm">No applicants found.</p>
         </div>
@@ -335,7 +346,7 @@ export default function Applicants() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((app, i) => (
+                {applicants.map((app, i) => (
                   <tr key={app._id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-500">{i + 1}</td>
                     <td className="px-4 py-3">
@@ -387,8 +398,17 @@ export default function Applicants() {
                 ))}
               </tbody>
             </table>
+
           </div>
+          <div className="border-t border-gray-200 px-4">
+  <Pagination
+    page={page}
+    totalPages={totalPages}
+    onPageChange={(p) => setPage(p)}
+  />
+</div>
         </div>
+        
       )}
 
       {/* Bulk Update Modal */}

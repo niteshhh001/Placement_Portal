@@ -1,38 +1,58 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
-const SECTORS = ["All", "IT", "Core", "Finance", "Consulting", "Government", "Other"];
+import Pagination from "../../components/Pagination";
+
+const SECTORS = ["IT", "Core", "Finance", "Consulting", "Government", "Analytics", "Other"];
 
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [sector, setSector] = useState("All");
+  const [filterSector, setFilterSector] = useState("");
   const [showEligible, setShowEligible] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const { user } = useAuth();
+
   useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [page, filterSector]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      fetchJobs();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const fetchJobs = async () => {
+    setLoading(true);
     try {
-      const res = await API.get("/jobs");
+      const params = new URLSearchParams({
+        page,
+        limit: 20,
+        ...(filterSector && { sector: filterSector }),
+        ...(search && { search }),
+      });
+      const res = await API.get(`/jobs?${params}`);
       setJobs(res.data.data);
+      setTotal(res.data.total);
+      setTotalPages(res.data.totalPages);
     } catch (err) {
-      console.error(err);
+      toast.error("Failed to load jobs");
     } finally {
       setLoading(false);
     }
   };
 
-  const filtered = jobs.filter((job) => {
-    const matchSearch = job.companyName.toLowerCase().includes(search.toLowerCase()) ||
-      job.jobRole.toLowerCase().includes(search.toLowerCase());
-    const matchSector = sector === "All" || job.sector === sector;
-    const matchEligible = !showEligible || job.eligible;
-    return matchSearch && matchSector && matchEligible;
-  });
+  // Filter eligible only on frontend (already paginated from backend)
+  const displayed = showEligible ? jobs.filter((j) => j.eligible) : jobs;
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -42,23 +62,27 @@ export default function Jobs() {
 
   return (
     <div className="space-y-6">
+      <Toaster position="top-right" />
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Job Listings</h1>
-        <p className="text-gray-500 text-sm mt-1">{filtered.length} jobs found</p>
+        <p className="text-gray-500 text-sm mt-1">
+          Showing {jobs.length} of {total} jobs
+        </p>
       </div>
 
       {/* Verification Pending Banner */}
-  {!user?.isVerified && (
-  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
-    <span className="text-yellow-500 text-xl shrink-0">⏳</span>
-    <div>
-      <p className="text-sm font-medium text-yellow-800">Account not verified yet</p>
-      <p className="text-xs text-yellow-700 mt-1">
-        You can browse jobs but the Apply button will be enabled only after admin verification.
-      </p>
-    </div>
-  </div>
-)}
+      {!user?.isVerified && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+          <span className="text-yellow-500 text-xl shrink-0">⏳</span>
+          <div>
+            <p className="text-sm font-medium text-yellow-800">Account not verified yet</p>
+            <p className="text-xs text-yellow-700 mt-1">
+              You can browse jobs but the Apply button will be enabled only after admin verification.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -70,11 +94,14 @@ export default function Jobs() {
           className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <select
-          value={sector}
-          onChange={(e) => setSector(e.target.value)}
-          className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          value={filterSector}
+          onChange={(e) => { setFilterSector(e.target.value); setPage(1); }}
+          className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+          <option value="">All Sectors</option>
+          {SECTORS.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
         </select>
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer whitespace-nowrap">
           <input
@@ -88,13 +115,13 @@ export default function Jobs() {
       </div>
 
       {/* Job Cards */}
-      {filtered.length === 0 ? (
+      {displayed.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <p className="text-gray-400">No jobs found matching your filters.</p>
         </div>
       ) : (
         <div className="grid gap-4">
-          {filtered.map((job) => (
+          {displayed.map((job) => (
             <div
               key={job._id}
               className="bg-white rounded-xl border border-gray-200 p-5 hover:border-indigo-300 transition"
@@ -123,9 +150,9 @@ export default function Jobs() {
                     <span>📍 {job.location?.join(", ") || "TBD"}</span>
                     <span>🏢 {job.sector}</span>
                     <span>📅 Apply by {new Date(job.applicationDeadline).toLocaleString("en-IN", {
-  day: "numeric", month: "short", year: "numeric",
-  hour: "2-digit", minute: "2-digit", hour12: true
-})}</span>
+                      day: "numeric", month: "short", year: "numeric",
+                      hour: "2-digit", minute: "2-digit", hour12: true
+                    })}</span>
                   </div>
 
                   {/* Ineligibility reasons */}
@@ -149,6 +176,17 @@ export default function Jobs() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 px-4">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={(p) => { setPage(p); window.scrollTo(0, 0); }}
+          />
         </div>
       )}
     </div>

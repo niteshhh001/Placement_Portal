@@ -269,19 +269,34 @@ const getStats = asyncHandler(async (req, res) => {
 // @desc    Get all applicants for a job
 // @route   GET /api/admin/jobs/:id/applicants
 const getApplicants = asyncHandler(async (req, res) => {
-  const { status, branch, minCgpa } = req.query;
+  const { status, branch, minCgpa, page = 1, limit = 20 } = req.query;
+
   const query = { job: req.params.id };
   if (status) query.status = status;
 
-  let applicants = await Application.find(query)
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const skip = (pageNum - 1) * limitNum;
+
+  let applicantsQuery = Application.find(query)
     .populate("student", "name rollNo email phone branch cgpa activeBacklogs isPlaced photoUrl resumeUrl")
     .sort({ appliedAt: -1 });
 
-  // Optional filters
+  const total = await Application.countDocuments(query);
+
+  let applicants = await applicantsQuery.skip(skip).limit(limitNum);
+
   if (branch) applicants = applicants.filter((a) => a.student?.branch === branch);
   if (minCgpa) applicants = applicants.filter((a) => a.student?.cgpa >= parseFloat(minCgpa));
 
-  res.json({ success: true, count: applicants.length, data: applicants });
+  res.json({
+    success: true,
+    count: applicants.length,
+    total,
+    page: pageNum,
+    totalPages: Math.ceil(total / limitNum),
+    data: applicants,
+  });
 });
 
 // @desc    Update application status
@@ -405,17 +420,8 @@ ws["!cols"] = [
 // @desc    Get all students
 // @route   GET /api/admin/students
 const getAllStudents = asyncHandler(async (req, res) => {
-  const { branch, year, isPlaced, minCgpa, search } = req.query;
+  const { branch, year, isPlaced, minCgpa, search, page = 1, limit = 20 } = req.query;
 
-  // Only use cache when no filters applied
-  if (!branch && !year && !isPlaced && !minCgpa && !search) {
-    const data = await withCache(CACHE_KEYS.ALL_STUDENTS, TTL.STUDENTS, async () => {
-      return await Student.find().sort({ name: 1 });
-    });
-    return res.json({ success: true, count: data.length, data });
-  }
-
-  // With filters — skip cache
   const query = {};
   if (branch) query.branch = branch;
   if (year) query.year = parseInt(year);
@@ -427,8 +433,23 @@ const getAllStudents = asyncHandler(async (req, res) => {
     { email: { $regex: search, $options: "i" } },
   ];
 
-  const students = await Student.find(query).sort({ name: 1 });
-  res.json({ success: true, count: students.length, data: students });
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const skip = (pageNum - 1) * limitNum;
+
+  const [students, total] = await Promise.all([
+    Student.find(query).sort({ name: 1 }).skip(skip).limit(limitNum),
+    Student.countDocuments(query),
+  ]);
+
+  res.json({
+    success: true,
+    count: students.length,
+    total,
+    page: pageNum,
+    totalPages: Math.ceil(total / limitNum),
+    data: students,
+  });
 });
 
 // @desc    Verify a student

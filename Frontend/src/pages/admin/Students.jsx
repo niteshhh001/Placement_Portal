@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import ResumeViewer from "../../components/ResumeViewer";
+import Pagination from "../../components/Pagination";
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
@@ -11,15 +12,39 @@ export default function AdminStudents() {
   const [filterPlaced, setFilterPlaced] = useState("");
   const [filterVerified, setFilterVerified] = useState("");
   const [viewingResume, setViewingResume] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const LIMIT = 20;
 
   useEffect(() => {
     fetchStudents();
-  }, []);
+  }, [page, filterBranch, filterPlaced, filterVerified]);
+
+  // Reset page when search changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      fetchStudents();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const fetchStudents = async () => {
+    setLoading(true);
     try {
-      const res = await API.get("/admin/students");
+      const params = new URLSearchParams({
+        page,
+        limit: LIMIT,
+        ...(filterBranch && { branch: filterBranch }),
+        ...(filterPlaced && { isPlaced: filterPlaced }),
+        ...(search && { search }),
+      });
+
+      const res = await API.get(`/admin/students?${params}`);
       setStudents(res.data.data);
+      setTotal(res.data.total);
+      setTotalPages(res.data.totalPages);
     } catch (err) {
       toast.error("Failed to load students");
     } finally {
@@ -27,10 +52,15 @@ export default function AdminStudents() {
     }
   };
 
+  const handleFilterChange = (setter) => (e) => {
+    setter(e.target.value);
+    setPage(1);
+  };
+
   const verifyStudent = async (id) => {
     try {
       await API.patch(`/admin/students/${id}/verify`);
-      toast.success("Student verified! Email sent to student.");
+      toast.success("Student verified! Email sent.");
       fetchStudents();
     } catch (err) {
       toast.error("Failed to verify student");
@@ -60,28 +90,7 @@ export default function AdminStudents() {
     }
   };
 
-  const openResume = (url) => {
-    setViewingResume(url);
-  };
-
-  const filtered = students.filter((s) => {
-    const matchSearch = !search ||
-      s.name?.toLowerCase().includes(search.toLowerCase()) ||
-      s.rollNo?.toLowerCase().includes(search.toLowerCase()) ||
-      s.email?.toLowerCase().includes(search.toLowerCase());
-    const matchBranch = !filterBranch || s.branch === filterBranch;
-    const matchPlaced = filterPlaced === "" ||
-      (filterPlaced === "true" ? s.isPlaced : !s.isPlaced);
-    const matchVerified = filterVerified === "" ||
-      (filterVerified === "verified" ? s.isVerified : !s.isVerified);
-    return matchSearch && matchBranch && matchPlaced && matchVerified;
-  });
-
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-    </div>
-  );
+  const openResume = (url) => setViewingResume(url);
 
   return (
     <div className="space-y-6">
@@ -90,20 +99,17 @@ export default function AdminStudents() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Students</h1>
-          <p className="text-gray-500 text-sm mt-1">{students.length} registered students</p>
+          <p className="text-gray-500 text-sm mt-1">{total} registered students</p>
         </div>
         <div className="flex gap-2 text-sm flex-wrap">
           <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
-            {students.filter((s) => s.isPlaced).length} Placed
+            Placed: {students.filter((s) => s.isPlaced).length}
           </span>
           <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-medium">
-            {students.filter((s) => !s.isVerified && !s.isBlocked).length} Pending Verification
+            Pending: {students.filter((s) => !s.isVerified && !s.isBlocked).length}
           </span>
           <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-medium">
-            {students.filter((s) => s.isBlocked).length} Debarred
-          </span>
-          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-medium">
-            {students.filter((s) => !s.isPlaced && !s.isBlocked).length} Unplaced
+            Debarred: {students.filter((s) => s.isBlocked).length}
           </span>
         </div>
       </div>
@@ -112,17 +118,16 @@ export default function AdminStudents() {
       {students.filter((s) => !s.isVerified && !s.isBlocked).length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
           <span className="text-yellow-500 text-xl shrink-0">⚠️</span>
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-medium text-yellow-800">
-              {students.filter((s) => !s.isVerified && !s.isBlocked).length} student(s) waiting for verification
+              Students waiting for verification
             </p>
             <p className="text-xs text-yellow-700 mt-1">
-              These students cannot apply to any company until you verify them.
-              Use the filter below to find them quickly.
+              These students cannot apply until verified.
             </p>
           </div>
           <button
-            onClick={() => setFilterVerified("unverified")}
+            onClick={() => { setFilterVerified("unverified"); setPage(1); }}
             className="shrink-0 text-xs font-medium text-yellow-700 border border-yellow-300 px-3 py-1.5 rounded-lg hover:bg-yellow-100 transition"
           >
             Show Pending
@@ -141,7 +146,7 @@ export default function AdminStudents() {
         />
         <select
           value={filterBranch}
-          onChange={(e) => setFilterBranch(e.target.value)}
+          onChange={handleFilterChange(setFilterBranch)}
           className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <option value="">All Branches</option>
@@ -151,7 +156,7 @@ export default function AdminStudents() {
         </select>
         <select
           value={filterPlaced}
-          onChange={(e) => setFilterPlaced(e.target.value)}
+          onChange={handleFilterChange(setFilterPlaced)}
           className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <option value="">All Students</option>
@@ -160,26 +165,31 @@ export default function AdminStudents() {
         </select>
         <select
           value={filterVerified}
-          onChange={(e) => setFilterVerified(e.target.value)}
+          onChange={handleFilterChange(setFilterVerified)}
           className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          <option value="">All Verification Status</option>
+          <option value="">All Verification</option>
           <option value="verified">Verified</option>
           <option value="unverified">Pending Verification</option>
         </select>
-        {filterVerified && (
+        {(filterVerified || filterBranch || filterPlaced || search) && (
           <button
-            onClick={() => setFilterVerified("")}
+            onClick={() => {
+              setFilterVerified("");
+              setFilterBranch("");
+              setFilterPlaced("");
+              setSearch("");
+              setPage(1);
+            }}
             className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-2 rounded-lg"
           >
-            Clear filter ×
+            Clear all ×
           </button>
         )}
       </div>
 
-      {/* Showing count */}
       <p className="text-xs text-gray-500">
-        Showing {filtered.length} of {students.length} students
+        Showing {students.length} of {total} students
       </p>
 
       {/* Students Table */}
@@ -198,14 +208,20 @@ export default function AdminStudents() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"></div>
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-gray-400 text-sm">
-                    No students found matching your filters.
+                    No students found.
                   </td>
                 </tr>
               ) : (
-                filtered.map((student) => (
+                students.map((student) => (
                   <tr
                     key={student._id}
                     className={`hover:bg-gray-50 ${student.isBlocked ? "bg-red-50" : !student.isVerified ? "bg-yellow-50" : ""}`}
@@ -213,11 +229,7 @@ export default function AdminStudents() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {student.photoUrl ? (
-                          <img
-                            src={student.photoUrl}
-                            alt=""
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
+                          <img src={student.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
                         ) : (
                           <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
                             <span className="text-xs font-bold text-indigo-700">
@@ -249,7 +261,7 @@ export default function AdminStudents() {
                         )}
                         {!student.isVerified && !student.isBlocked && (
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-yellow-100 text-yellow-700">
-                            ⏳ Pending Verification
+                            ⏳ Pending
                           </span>
                         )}
                         {student.isVerified && (
@@ -311,13 +323,19 @@ export default function AdminStudents() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <div className="border-t border-gray-200 px-4">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={(p) => setPage(p)}
+          />
+        </div>
       </div>
 
       {viewingResume && (
-        <ResumeViewer
-          url={viewingResume}
-          onClose={() => setViewingResume(null)}
-        />
+        <ResumeViewer url={viewingResume} onClose={() => setViewingResume(null)} />
       )}
     </div>
   );
