@@ -27,4 +27,8 @@ const applicationSchema = new mongoose.Schema(
 
 applicationSchema.index({ student: 1, job: 1 }, { unique: true });
 
+applicationSchema.index({ student: 1, appliedAt: -1 }); // speeds up student's applications query
+applicationSchema.index({ job: 1, student: 1 }, { unique: true }); // already exists but make sure
+applicationSchema.index({ job: 1, status: 1 }); // speeds up admin applicants query
+
 module.exports = mongoose.model("Application", applicationSchema);

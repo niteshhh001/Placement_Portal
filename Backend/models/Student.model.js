@@ -59,5 +59,8 @@ studentSchema.methods.checkProfileComplete = function () {
   this.isProfileComplete = required.every(Boolean);
   return this.isProfileComplete;
 };
-
+studentSchema.index({ rollNo: 1 }, { unique: true });
+studentSchema.index({ email: 1 }, { unique: true });
+studentSchema.index({ branch: 1, isPlaced: 1 });
+studentSchema.index({ isVerified: 1, isBlocked: 1 });
 module.exports = mongoose.model("Student", studentSchema);
