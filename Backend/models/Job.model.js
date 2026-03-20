@@ -56,5 +56,7 @@ const jobSchema = new mongoose.Schema(
 );
 
 jobSchema.index({ status: 1, "eligibility.allowedBranches": 1 });
+jobSchema.index({ status: 1, createdAt: -1 }); // speeds up job listings
+jobSchema.index({ companyName: "text", jobRole: "text" }); // speeds up search
 
 module.exports = mongoose.model("Job", jobSchema);

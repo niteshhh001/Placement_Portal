@@ -173,7 +173,9 @@ const applyToJob = asyncHandler(async (req, res) => {
   // Increment applicant count
   await Job.findByIdAndUpdate(job._id, { $inc: { totalApplicants: 1 } });
   // Invalidate cache so applicant count updates immediately
-invalidateCache(CACHE_KEYS.OPEN_JOBS, CACHE_KEYS.ALL_JOBS);
+  invalidateCache(CACHE_KEYS.OPEN_JOBS, CACHE_KEYS.ALL_JOBS);
+// Invalidate student applications cache
+  invalidateCache(`student_applications_${req.user._id}_p1`);
   res.status(201).json({ success: true, message: "Application submitted!", data: application });
 });
 

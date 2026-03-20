@@ -269,34 +269,41 @@ const getStats = asyncHandler(async (req, res) => {
 // @desc    Get all applicants for a job
 // @route   GET /api/admin/jobs/:id/applicants
 const getApplicants = asyncHandler(async (req, res) => {
-  const { status, branch, minCgpa, page = 1, limit = 20 } = req.query;
-
-  const query = { job: req.params.id };
-  if (status) query.status = status;
+  const { status, branch, page = 1, limit = 20 } = req.query;
 
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
   const skip = (pageNum - 1) * limitNum;
 
-  let applicantsQuery = Application.find(query)
-    .populate("student", "name rollNo email phone branch cgpa activeBacklogs isPlaced photoUrl resumeUrl")
-    .sort({ appliedAt: -1 });
+  const cacheKey = `applicants_${req.params.id}_p${pageNum}_s${status || "all"}_b${branch || "all"}`;
 
-  const total = await Application.countDocuments(query);
+  const result = await withCache(cacheKey, 60, async () => {
+    const query = { job: req.params.id };
+    if (status) query.status = status;
 
-  let applicants = await applicantsQuery.skip(skip).limit(limitNum);
+    const [applicants, total] = await Promise.all([
+      Application.find(query)
+        .populate("student", "name rollNo email phone branch cgpa activeBacklogs isPlaced photoUrl resumeUrl")
+        .sort({ appliedAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Application.countDocuments(query),
+    ]);
 
-  if (branch) applicants = applicants.filter((a) => a.student?.branch === branch);
-  if (minCgpa) applicants = applicants.filter((a) => a.student?.cgpa >= parseFloat(minCgpa));
+    let filtered = applicants;
+    if (branch) filtered = applicants.filter((a) => a.student?.branch === branch);
 
-  res.json({
-    success: true,
-    count: applicants.length,
-    total,
-    page: pageNum,
-    totalPages: Math.ceil(total / limitNum),
-    data: applicants,
+    return {
+      count: filtered.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
+      data: filtered,
+    };
   });
+
+  res.json({ success: true, ...result });
 });
 
 // @desc    Update application status
@@ -358,6 +365,8 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
     });
   }
   invalidateCache(CACHE_KEYS.STATS);
+  // Invalidate applicants cache for this job
+invalidateCache(`applicants_${application.job}_p1_sall_ball`);
   res.json({ success: true, message: "Status updated.", data: application });
 });
 
@@ -422,10 +431,36 @@ ws["!cols"] = [
 const getAllStudents = asyncHandler(async (req, res) => {
   const { branch, year, isPlaced, minCgpa, search, page = 1, limit = 20 } = req.query;
 
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const skip = (pageNum - 1) * limitNum;
+
+  // Use cache only when no filters applied
+  const hasFilters = branch || year || isPlaced || minCgpa || search;
+
+  if (!hasFilters) {
+    const cacheKey = `all_students_p${pageNum}`;
+    const result = await withCache(cacheKey, TTL.STUDENTS, async () => {
+      const [students, total] = await Promise.all([
+        Student.find().sort({ name: 1 }).skip(skip).limit(limitNum).lean(),
+        Student.countDocuments(),
+      ]);
+      return {
+        count: students.length,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        data: students,
+      };
+    });
+    return res.json({ success: true, ...result });
+  }
+
+  // With filters — skip cache, hit DB directly
   const query = {};
   if (branch) query.branch = branch;
   if (year) query.year = parseInt(year);
-  if (isPlaced !== undefined) query.isPlaced = isPlaced === "true";
+  if (isPlaced !== undefined && isPlaced !== "") query.isPlaced = isPlaced === "true";
   if (minCgpa) query.cgpa = { $gte: parseFloat(minCgpa) };
   if (search) query.$or = [
     { name: { $regex: search, $options: "i" } },
@@ -433,12 +468,8 @@ const getAllStudents = asyncHandler(async (req, res) => {
     { email: { $regex: search, $options: "i" } },
   ];
 
-  const pageNum = parseInt(page);
-  const limitNum = parseInt(limit);
-  const skip = (pageNum - 1) * limitNum;
-
   const [students, total] = await Promise.all([
-    Student.find(query).sort({ name: 1 }).skip(skip).limit(limitNum),
+    Student.find(query).sort({ name: 1 }).skip(skip).limit(limitNum).lean(),
     Student.countDocuments(query),
   ]);
 
@@ -483,7 +514,7 @@ const verifyStudent = asyncHandler(async (req, res) => {
       </div>
     `,
   });
-  invalidateCache(CACHE_KEYS.ALL_STUDENTS, CACHE_KEYS.STATS);
+invalidateCache(CACHE_KEYS.ALL_STUDENTS, "all_students_p1", "all_students_p2", "all_students_p3");
   res.json({ success: true, message: "Student verified. Email sent.", data: student });
 });
 
@@ -547,7 +578,7 @@ const blockStudent = asyncHandler(async (req, res) => {
       </div>
     `,
   });
-  invalidateCache(CACHE_KEYS.ALL_STUDENTS);
+invalidateCache(CACHE_KEYS.ALL_STUDENTS, "all_students_p1", "all_students_p2", "all_students_p3");
   res.json({
     success: true,
     message: `${student.name} has been debarred.`,
@@ -584,7 +615,7 @@ const unblockStudent = asyncHandler(async (req, res) => {
       </div>
     `,
   });
-  invalidateCache(CACHE_KEYS.ALL_STUDENTS);
+invalidateCache(CACHE_KEYS.ALL_STUDENTS, "all_students_p1", "all_students_p2", "all_students_p3");
   res.json({
     success: true,
     message: `${student.name} has been reinstated.`,
