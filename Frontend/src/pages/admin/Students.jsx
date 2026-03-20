@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import ResumeViewer from "../../components/ResumeViewer";
@@ -21,7 +22,6 @@ export default function AdminStudents() {
     fetchStudents();
   }, [page, filterBranch, filterPlaced, filterVerified]);
 
-  // Reset page when search changes
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(1);
@@ -40,7 +40,6 @@ export default function AdminStudents() {
         ...(filterPlaced && { isPlaced: filterPlaced }),
         ...(search && { search }),
       });
-
       const res = await API.get(`/admin/students?${params}`);
       setStudents(res.data.data);
       setTotal(res.data.total);
@@ -183,7 +182,7 @@ export default function AdminStudents() {
             }}
             className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-2 rounded-lg"
           >
-            Clear all ×
+            Clear all 
           </button>
         )}
       </div>
@@ -261,11 +260,14 @@ export default function AdminStudents() {
                         )}
                         {!student.isVerified && !student.isBlocked && (
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-yellow-100 text-yellow-700">
-                            ⏳ Pending
+                             Pending
                           </span>
                         )}
                         {student.isVerified && (
-                          <span className="text-xs text-green-600">✓ Verified</span>
+                          <span className="text-xs text-green-600"> Verified</span>
+                        )}
+                        {student.isProfileLocked && (
+                          <span className="text-xs text-orange-600"> Locked</span>
                         )}
                         {student.isBlocked && student.blockReason && (
                           <span className="text-xs text-red-500 italic truncate max-w-32">
@@ -284,6 +286,13 @@ export default function AdminStudents() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {/* View Full Profile */}
+                        <Link
+                          to={`/admin/students/${student._id}`}
+                          className="text-xs text-indigo-600 hover:underline font-medium"
+                        >
+                          View
+                        </Link>
                         {student.resumeUrl && (
                           <button
                             onClick={() => openResume(student.resumeUrl)}

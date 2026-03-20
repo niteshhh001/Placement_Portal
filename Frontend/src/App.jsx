@@ -18,6 +18,7 @@ import AdminStudents from "./pages/admin/Students";
 import Notifications from "./pages/admin/Notifications";
 import ForgotPassword from "./pages/ForgotPassword";
 import Contact from "./pages/student/Contact";
+import StudentProfile from "./pages/admin/StudentProfile";
 function App() {
   return (
     <AuthProvider>
@@ -55,6 +56,7 @@ function App() {
             <Route path="jobs/:id/applicants" element={<Applicants />} />
             <Route path="students" element={<AdminStudents />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="students/:id" element={<StudentProfile />} />
           </Route>
         </Routes>
       </BrowserRouter>

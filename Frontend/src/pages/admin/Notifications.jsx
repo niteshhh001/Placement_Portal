@@ -115,7 +115,7 @@ export default function Notifications() {
             disabled={loading}
             className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50"
           >
-            {loading ? "Sending..." : "📢 Send Notification"}
+            {loading ? "Sending..." : " Send Notification"}
           </button>
         </div>
       </form>

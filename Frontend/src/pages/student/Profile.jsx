@@ -15,20 +15,8 @@ export default function Profile() {
   const [skillInput, setSkillInput] = useState("");
   const [viewingResume, setViewingResume] = useState(null);
   const [education, setEducation] = useState({
-    tenth: {
-      level: "10th",
-      institution: "",
-      board: "",
-      percentage: "",
-      passingYear: "",
-    },
-    twelfth: {
-      level: "12th",
-      institution: "",
-      board: "",
-      percentage: "",
-      passingYear: "",
-    },
+    tenth: { level: "10th", institution: "", board: "", percentage: "", passingYear: "" },
+    twelfth: { level: "12th", institution: "", board: "", percentage: "", passingYear: "" },
   });
 
   const { refreshUser } = useAuth();
@@ -44,7 +32,6 @@ export default function Profile() {
       setProfile(res.data.data);
       setSkills(res.data.data.skills || []);
 
-      // Populate education state
       const edu = res.data.data.education || [];
       const tenth = edu.find((e) => e.level === "10th") || {};
       const twelfth = edu.find((e) => e.level === "12th") || {};
@@ -84,7 +71,6 @@ export default function Profile() {
   const onSubmit = async (data) => {
     setSaving(true);
     try {
-      // Build education array
       const educationArray = [];
 
       if (education.tenth.institution || education.tenth.percentage) {
@@ -92,12 +78,8 @@ export default function Profile() {
           level: "10th",
           institution: education.tenth.institution,
           board: education.tenth.board,
-          percentage: education.tenth.percentage
-            ? parseFloat(education.tenth.percentage)
-            : undefined,
-          passingYear: education.tenth.passingYear
-            ? parseInt(education.tenth.passingYear)
-            : undefined,
+          percentage: education.tenth.percentage ? parseFloat(education.tenth.percentage) : undefined,
+          passingYear: education.tenth.passingYear ? parseInt(education.tenth.passingYear) : undefined,
         });
       }
 
@@ -106,12 +88,8 @@ export default function Profile() {
           level: "12th",
           institution: education.twelfth.institution,
           board: education.twelfth.board,
-          percentage: education.twelfth.percentage
-            ? parseFloat(education.twelfth.percentage)
-            : undefined,
-          passingYear: education.twelfth.passingYear
-            ? parseInt(education.twelfth.passingYear)
-            : undefined,
+          percentage: education.twelfth.percentage ? parseFloat(education.twelfth.percentage) : undefined,
+          passingYear: education.twelfth.passingYear ? parseInt(education.twelfth.passingYear) : undefined,
         });
       }
 
@@ -184,15 +162,19 @@ export default function Profile() {
     setSkills(skills.filter((s) => s !== skill));
   };
 
-  const openResume = (url) => {
-    setViewingResume(url);
-  };
+  const openResume = (url) => setViewingResume(url);
+
+  const isLocked = profile?.isProfileLocked;
 
   const fields = [
     profile?.name, profile?.email, profile?.phone,
     profile?.branch, profile?.cgpa, profile?.resumeUrl,
   ];
   const completion = Math.round((fields.filter(Boolean).length / fields.length) * 100);
+
+  // Locked input class
+  const lockedInputClass = "w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm bg-gray-50 text-gray-500 cursor-not-allowed";
+  const normalInputClass = "w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -226,6 +208,20 @@ export default function Profile() {
           />
         </div>
       </div>
+
+      {/* Profile Locked Banner */}
+      {isLocked && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3">
+          <span className="text-orange-500 text-xl shrink-0">🔒</span>
+          <div>
+            <p className="text-sm font-medium text-orange-800">Profile is locked by placement cell</p>
+            <p className="text-xs text-orange-700 mt-1">
+              Your academic details (CGPA, backlogs, 10th & 12th marks) are locked and cannot be changed.
+              You can still update your <strong>name, phone, photo, resume and skills</strong>.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Photo + Basic Info */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -272,7 +268,7 @@ export default function Profile() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={normalInputClass}
                 {...register("phone", {
                   pattern: { value: /^[6-9]\d{9}$/, message: "Invalid phone" }
                 })}
@@ -285,7 +281,7 @@ export default function Profile() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
               <select
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={normalInputClass}
                 {...register("gender")}
               >
                 <option value="">Select</option>
@@ -295,14 +291,18 @@ export default function Profile() {
               </select>
             </div>
 
+            {/* CGPA — locked if profile is locked */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CGPA</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                CGPA {isLocked && <span className="text-orange-500 text-xs">🔒 Locked</span>}
+              </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 max="10"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={isLocked}
+                className={isLocked ? lockedInputClass : normalInputClass}
                 {...register("cgpa", { min: 0, max: 10, valueAsNumber: true })}
               />
             </div>
@@ -311,37 +311,41 @@ export default function Profile() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={normalInputClass}
                 {...register("section")}
               />
             </div>
 
+            {/* Active Backlogs — locked */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Active Backlogs
+                Active Backlogs {isLocked && <span className="text-orange-500 text-xs">🔒 Locked</span>}
               </label>
               <input
                 type="number"
                 min="0"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={isLocked}
+                className={isLocked ? lockedInputClass : normalInputClass}
                 {...register("activeBacklogs", { valueAsNumber: true })}
               />
             </div>
 
+            {/* Total Backlogs — locked */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Total Backlogs
+                Total Backlogs {isLocked && <span className="text-orange-500 text-xs">🔒 Locked</span>}
               </label>
               <input
                 type="number"
                 min="0"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={isLocked}
+                className={isLocked ? lockedInputClass : normalInputClass}
                 {...register("totalBacklogs", { valueAsNumber: true })}
               />
             </div>
           </div>
 
-          {/* Skills */}
+          {/* Skills — always editable */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Skills</label>
             <div className="flex gap-2 mb-2">
@@ -385,15 +389,22 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Education Details */}
+          {/* Education Details — locked if profile is locked */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Education Details
-            </label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Education Details
+              </label>
+              {isLocked && (
+                <span className="text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+                  🔒 Academic details locked
+                </span>
+              )}
+            </div>
             <div className="space-y-3">
 
               {/* 10th */}
-              <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+              <div className={`border rounded-lg p-4 space-y-3 ${isLocked ? "border-orange-200 bg-orange-50" : "border-gray-200"}`}>
                 <p className="text-sm font-medium text-gray-700">10th Standard</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -401,12 +412,10 @@ export default function Profile() {
                     <input
                       type="text"
                       placeholder="School name"
+                      disabled={isLocked}
                       value={education.tenth.institution}
-                      onChange={(e) => setEducation({
-                        ...education,
-                        tenth: { ...education.tenth, institution: e.target.value }
-                      })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setEducation({ ...education, tenth: { ...education.tenth, institution: e.target.value } })}
+                      className={isLocked ? "w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-orange-50 text-gray-500 cursor-not-allowed" : "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"}
                     />
                   </div>
                   <div>
@@ -417,12 +426,10 @@ export default function Profile() {
                       min="0"
                       max="100"
                       placeholder="e.g. 92.5"
+                      disabled={isLocked}
                       value={education.tenth.percentage}
-                      onChange={(e) => setEducation({
-                        ...education,
-                        tenth: { ...education.tenth, percentage: e.target.value }
-                      })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setEducation({ ...education, tenth: { ...education.tenth, percentage: e.target.value } })}
+                      className={isLocked ? "w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-orange-50 text-gray-500 cursor-not-allowed" : "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"}
                     />
                   </div>
                   <div>
@@ -430,12 +437,10 @@ export default function Profile() {
                     <input
                       type="text"
                       placeholder="e.g. CBSE"
+                      disabled={isLocked}
                       value={education.tenth.board}
-                      onChange={(e) => setEducation({
-                        ...education,
-                        tenth: { ...education.tenth, board: e.target.value }
-                      })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setEducation({ ...education, tenth: { ...education.tenth, board: e.target.value } })}
+                      className={isLocked ? "w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-orange-50 text-gray-500 cursor-not-allowed" : "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"}
                     />
                   </div>
                   <div>
@@ -443,19 +448,17 @@ export default function Profile() {
                     <input
                       type="number"
                       placeholder="e.g. 2018"
+                      disabled={isLocked}
                       value={education.tenth.passingYear}
-                      onChange={(e) => setEducation({
-                        ...education,
-                        tenth: { ...education.tenth, passingYear: e.target.value }
-                      })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setEducation({ ...education, tenth: { ...education.tenth, passingYear: e.target.value } })}
+                      className={isLocked ? "w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-orange-50 text-gray-500 cursor-not-allowed" : "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"}
                     />
                   </div>
                 </div>
               </div>
 
               {/* 12th */}
-              <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+              <div className={`border rounded-lg p-4 space-y-3 ${isLocked ? "border-orange-200 bg-orange-50" : "border-gray-200"}`}>
                 <p className="text-sm font-medium text-gray-700">12th Standard</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -463,12 +466,10 @@ export default function Profile() {
                     <input
                       type="text"
                       placeholder="School name"
+                      disabled={isLocked}
                       value={education.twelfth.institution}
-                      onChange={(e) => setEducation({
-                        ...education,
-                        twelfth: { ...education.twelfth, institution: e.target.value }
-                      })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setEducation({ ...education, twelfth: { ...education.twelfth, institution: e.target.value } })}
+                      className={isLocked ? "w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-orange-50 text-gray-500 cursor-not-allowed" : "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"}
                     />
                   </div>
                   <div>
@@ -479,12 +480,10 @@ export default function Profile() {
                       min="0"
                       max="100"
                       placeholder="e.g. 88.5"
+                      disabled={isLocked}
                       value={education.twelfth.percentage}
-                      onChange={(e) => setEducation({
-                        ...education,
-                        twelfth: { ...education.twelfth, percentage: e.target.value }
-                      })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setEducation({ ...education, twelfth: { ...education.twelfth, percentage: e.target.value } })}
+                      className={isLocked ? "w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-orange-50 text-gray-500 cursor-not-allowed" : "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"}
                     />
                   </div>
                   <div>
@@ -492,12 +491,10 @@ export default function Profile() {
                     <input
                       type="text"
                       placeholder="e.g. CBSE"
+                      disabled={isLocked}
                       value={education.twelfth.board}
-                      onChange={(e) => setEducation({
-                        ...education,
-                        twelfth: { ...education.twelfth, board: e.target.value }
-                      })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setEducation({ ...education, twelfth: { ...education.twelfth, board: e.target.value } })}
+                      className={isLocked ? "w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-orange-50 text-gray-500 cursor-not-allowed" : "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"}
                     />
                   </div>
                   <div>
@@ -505,12 +502,10 @@ export default function Profile() {
                     <input
                       type="number"
                       placeholder="e.g. 2020"
+                      disabled={isLocked}
                       value={education.twelfth.passingYear}
-                      onChange={(e) => setEducation({
-                        ...education,
-                        twelfth: { ...education.twelfth, passingYear: e.target.value }
-                      })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setEducation({ ...education, twelfth: { ...education.twelfth, passingYear: e.target.value } })}
+                      className={isLocked ? "w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-orange-50 text-gray-500 cursor-not-allowed" : "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"}
                     />
                   </div>
                 </div>
@@ -529,7 +524,7 @@ export default function Profile() {
         </form>
       </div>
 
-      {/* Resume */}
+      {/* Resume — always editable */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h2 className="font-semibold text-gray-900 mb-4">Resume</h2>
         {profile?.resumeUrl ? (
@@ -574,10 +569,7 @@ export default function Profile() {
       </div>
 
       {viewingResume && (
-        <ResumeViewer
-          url={viewingResume}
-          onClose={() => setViewingResume(null)}
-        />
+        <ResumeViewer url={viewingResume} onClose={() => setViewingResume(null)} />
       )}
     </div>
   );
