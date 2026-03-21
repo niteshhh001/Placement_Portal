@@ -550,6 +550,8 @@ export default function Profile() {
                 />
               </label>
             </div>
+            {/* Change Password */}
+            <ChangePasswordSection />
           </div>
         ) : (
           <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:border-indigo-400 transition">
@@ -573,4 +575,165 @@ export default function Profile() {
       )}
     </div>
   );
+  function ChangePasswordSection() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (newPassword !== confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await API.post("/student/change-password", {
+        currentPassword,
+        newPassword,
+      });
+      toast.success("Password changed successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to change password");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 className="font-semibold text-gray-900 mb-4">Change Password</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Current Password */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Current Password
+          </label>
+          <div className="relative">
+            <input
+              type={showCurrent ? "text" : "password"}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrent(!showCurrent)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+            >
+              {showCurrent ? "Hide" : "Show"}
+            </button>
+          </div>
+        </div>
+
+        {/* New Password */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            New Password
+          </label>
+          <div className="relative">
+            <input
+              type={showNew ? "text" : "password"}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Min 6 characters"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNew(!showNew)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+            >
+              {showNew ? "Hide" : "Show"}
+            </button>
+          </div>
+
+          {/* Password strength indicator */}
+          {newPassword && (
+            <div className="mt-2">
+              <div className="flex gap-1">
+                {[1, 2, 3, 4].map((level) => (
+                  <div
+                    key={level}
+                    className={`h-1 flex-1 rounded-full transition-all ${
+                      newPassword.length >= level * 3
+                        ? newPassword.length >= 10
+                          ? "bg-green-500"
+                          : newPassword.length >= 7
+                          ? "bg-yellow-500"
+                          : "bg-red-400"
+                        : "bg-gray-200"
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="text-xs mt-1 text-gray-500">
+                {newPassword.length < 6
+                  ? "Too short"
+                  : newPassword.length < 8
+                  ? "Weak"
+                  : newPassword.length < 10
+                  ? "Medium"
+                  : "Strong"}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Confirm Password */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Confirm New Password
+          </label>
+          <div className="relative">
+            <input
+              type={showConfirm ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter new password"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm(!showConfirm)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+            >
+              {showConfirm ? "Hide" : "Show"}
+            </button>
+          </div>
+
+          {/* Match indicator */}
+          {confirmPassword && (
+            <p className={`text-xs mt-1 ${newPassword === confirmPassword ? "text-green-600" : "text-red-500"}`}>
+              {newPassword === confirmPassword ? "✓ Passwords match" : "✗ Passwords do not match"}
+            </p>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+          className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? "Changing..." : "Change Password"}
+        </button>
+      </form>
+    </div>
+  );
+}
 }
