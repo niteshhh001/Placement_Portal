@@ -6,6 +6,7 @@ const {
   uploadResume,
   uploadPhoto,
   contactPlacementCell,
+  changePassword,
 } = require("../controllers/student.controller");
 const { protect, studentOnly } = require("../middleware/auth.middleware");
 const {
@@ -20,5 +21,6 @@ router.patch("/profile", updateProfile);
 router.post("/resume", resumeUpload.single("resume"), uploadResume);
 router.post("/photo", photoUpload.single("photo"), uploadPhoto);
 router.post("/contact", contactPlacementCell);
+router.post("/change-password", changePassword);
 
 module.exports = router;
