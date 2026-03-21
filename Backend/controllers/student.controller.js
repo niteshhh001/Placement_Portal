@@ -166,5 +166,57 @@ const contactPlacementCell = asyncHandler(async (req, res) => {
     message: "Message sent successfully! We will get back to you within 1-2 working days.",
   });
 });
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
 
-module.exports = { getProfile, updateProfile, uploadResume, uploadPhoto, contactPlacementCell };
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: "Current password and new password are required.",
+    });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: "New password must be at least 6 characters.",
+    });
+  }
+
+  if (currentPassword === newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: "New password must be different from current password.",
+    });
+  }
+
+  // Get student with password field
+  const student = await Student.findById(req.user._id).select("+password");
+
+  // Check current password
+  const isMatch = await student.comparePassword(currentPassword);
+  if (!isMatch) {
+    return res.status(400).json({
+      success: false,
+      message: "Current password is incorrect.",
+    });
+  }
+
+  // Update password — pre save hook will hash it
+  student.password = newPassword;
+  await student.save();
+
+  res.json({
+    success: true,
+    message: "Password changed successfully!",
+  });
+});
+
+module.exports = {
+  getProfile,
+  updateProfile,
+  uploadResume,
+  uploadPhoto,
+  contactPlacementCell,
+  changePassword,
+};
