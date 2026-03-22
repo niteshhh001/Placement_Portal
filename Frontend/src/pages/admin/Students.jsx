@@ -95,31 +95,43 @@ export default function AdminStudents() {
     <div className="space-y-6">
       <Toaster position="top-right" />
 
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Students</h1>
           <p className="text-gray-500 text-sm mt-1">{total} registered students</p>
         </div>
-        <div className="flex gap-2 text-sm flex-wrap">
-          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
-            Placed: {students.filter((s) => s.isPlaced).length}
-          </span>
-          <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-medium">
-            Pending: {students.filter((s) => !s.isVerified && !s.isBlocked).length}
-          </span>
-          <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-medium">
-            Debarred: {students.filter((s) => s.isBlocked).length}
-          </span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex gap-2 text-sm flex-wrap">
+            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
+              Placed: {students.filter((s) => s.isPlaced).length}
+            </span>
+            <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-medium">
+              Pending: {students.filter((s) => s.accountStatus === "pending_verification").length}
+            </span>
+            <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full font-medium">
+              Not Activated: {students.filter((s) => s.accountStatus === "pending_activation").length}
+            </span>
+            <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-medium">
+              Debarred: {students.filter((s) => s.isBlocked).length}
+            </span>
+          </div>
+          <Link
+            to="/admin/students/import"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center gap-2"
+          >
+             Import Students
+          </Link>
         </div>
       </div>
 
       {/* Pending Verification Alert */}
-      {students.filter((s) => !s.isVerified && !s.isBlocked).length > 0 && (
+      {students.filter((s) => s.accountStatus === "pending_verification").length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
           <span className="text-yellow-500 text-xl shrink-0">⚠️</span>
           <div className="flex-1">
             <p className="text-sm font-medium text-yellow-800">
-              Students waiting for verification
+              {students.filter((s) => s.accountStatus === "pending_verification").length} student(s) waiting for verification
             </p>
             <p className="text-xs text-yellow-700 mt-1">
               These students cannot apply until verified.
@@ -131,6 +143,21 @@ export default function AdminStudents() {
           >
             Show Pending
           </button>
+        </div>
+      )}
+
+      {/* Not Activated Alert */}
+      {students.filter((s) => s.accountStatus === "pending_activation").length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3">
+          <span className="text-orange-500 text-xl shrink-0">📧</span>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-orange-800">
+              {students.filter((s) => s.accountStatus === "pending_activation").length} imported student(s) haven't activated their account yet
+            </p>
+            <p className="text-xs text-orange-700 mt-1">
+              They need to click the activation link sent to their email.
+            </p>
+          </div>
         </div>
       )}
 
@@ -167,9 +194,11 @@ export default function AdminStudents() {
           onChange={handleFilterChange(setFilterVerified)}
           className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          <option value="">All Verification</option>
+          <option value="">All Status</option>
+          <option value="active">Active</option>
           <option value="verified">Verified</option>
           <option value="unverified">Pending Verification</option>
+          <option value="pending_activation">Not Activated</option>
         </select>
         {(filterVerified || filterBranch || filterPlaced || search) && (
           <button
@@ -182,7 +211,7 @@ export default function AdminStudents() {
             }}
             className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-2 rounded-lg"
           >
-            Clear all 
+            Clear all ×
           </button>
         )}
       </div>
@@ -223,7 +252,15 @@ export default function AdminStudents() {
                 students.map((student) => (
                   <tr
                     key={student._id}
-                    className={`hover:bg-gray-50 ${student.isBlocked ? "bg-red-50" : !student.isVerified ? "bg-yellow-50" : ""}`}
+                    className={`hover:bg-gray-50 ${
+                      student.isBlocked
+                        ? "bg-red-50"
+                        : student.accountStatus === "pending_activation"
+                        ? "bg-orange-50"
+                        : student.accountStatus === "pending_verification"
+                        ? "bg-yellow-50"
+                        : ""
+                    }`}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -240,6 +277,9 @@ export default function AdminStudents() {
                           <p className="font-medium text-gray-900">{student.name}</p>
                           <p className="text-xs text-gray-500">{student.rollNo}</p>
                           <p className="text-xs text-gray-400">{student.email}</p>
+                          {student.source === "admin_import" && (
+                            <span className="text-xs text-indigo-500">📥 Imported</span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -258,13 +298,18 @@ export default function AdminStudents() {
                             {student.isPlaced ? "Placed" : "Unplaced"}
                           </span>
                         )}
-                        {!student.isVerified && !student.isBlocked && (
-                          <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-yellow-100 text-yellow-700">
-                             Pending
+                        {student.accountStatus === "pending_activation" && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-orange-100 text-orange-700">
+                             Not Activated
                           </span>
                         )}
-                        {student.isVerified && (
-                          <span className="text-xs text-green-600"> Verified</span>
+                        {student.accountStatus === "pending_verification" && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-yellow-100 text-yellow-700">
+                             Pending Verification
+                          </span>
+                        )}
+                        {student.accountStatus === "active" && (
+                          <span className="text-xs text-green-600"> Active</span>
                         )}
                         {student.isProfileLocked && (
                           <span className="text-xs text-orange-600"> Locked</span>
@@ -286,7 +331,6 @@ export default function AdminStudents() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {/* View Full Profile */}
                         <Link
                           to={`/admin/students/${student._id}`}
                           className="text-xs text-indigo-600 hover:underline font-medium"
@@ -301,7 +345,7 @@ export default function AdminStudents() {
                             Resume
                           </button>
                         )}
-                        {!student.isVerified && (
+                        {student.accountStatus === "pending_verification" && (
                           <button
                             onClick={() => verifyStudent(student._id)}
                             className="text-xs text-green-600 hover:underline font-medium bg-green-50 px-2 py-1 rounded"

@@ -19,6 +19,8 @@ import Notifications from "./pages/admin/Notifications";
 import ForgotPassword from "./pages/ForgotPassword";
 import Contact from "./pages/student/Contact";
 import StudentProfile from "./pages/admin/StudentProfile";
+import Activate from "./pages/Activate";
+import ImportStudents from "./pages/admin/ImportStudents";
 function App() {
   return (
     <AuthProvider>
@@ -29,6 +31,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/activate" element={<Activate />} />
 
           {/* Student */}
           <Route path="/student" element={
@@ -57,6 +60,7 @@ function App() {
             <Route path="students" element={<AdminStudents />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="students/:id" element={<StudentProfile />} />
+            <Route path="students/import" element={<ImportStudents />} />
           </Route>
         </Routes>
       </BrowserRouter>
