@@ -1,14 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const {
-  registerStudent,
-  verifyOtp,
-  login,
-  refreshToken,
-  getMe,
-  forgotPassword,
-  resetPassword,
-} = require("../controllers/auth.controller");
 const { protect } = require("../middleware/auth.middleware");
 const {
   validate,
@@ -18,6 +9,14 @@ const {
   forgotPasswordSchema,
   resetPasswordSchema,
 } = require("../middleware/validate.middleware");
+
+const {
+  registerStudent, verifyOtp, login, refreshToken, getMe,
+  forgotPassword, resetPassword, activateAccount, resendActivation,
+} = require("../controllers/auth.controller");
+
+router.post("/activate", activateAccount);
+router.post("/resend-activation", resendActivation);
 
 router.post("/student/register", validate(registerRequestSchema), registerStudent);
 router.post("/student/verify-otp", validate(verifyOtpSchema), verifyOtp);
