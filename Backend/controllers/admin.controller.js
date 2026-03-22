@@ -9,6 +9,7 @@ const {
   getPerformanceStats,
 } = require("../utils/cache.util");
 const AuditLog = require("../models/AuditLog.model");
+const crypto = require("crypto");
 
 const { asyncHandler } = require("../middleware/error.middleware");
 //const Job = require("../models/Job.model");
@@ -984,10 +985,197 @@ const lockStudentProfile = asyncHandler(async (req, res) => {
   });
 });
 
+const bulkImportStudents = asyncHandler(async (req, res) => {
+  const { students } = req.body;
+
+  if (!students || !Array.isArray(students) || students.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide students array.",
+    });
+  }
+
+  const results = {
+    imported: [],
+    skipped: [],
+    errors: [],
+  };
+
+  // Process in batches of 50
+  const batchSize = 50;
+  const emailQueue = [];
+
+  for (const row of students) {
+    try {
+      const { name, email, rollNo, branch, year, phone } = row;
+
+      // Validate required fields
+      if (!name || !email || !rollNo || !branch) {
+        results.errors.push({
+          row: rollNo || email,
+          reason: "Missing required fields (name, email, rollNo, branch)",
+        });
+        continue;
+      }
+
+      // Check if email domain is valid
+      const emailDomain = email.split("@")[1];
+      const allowedDomain = process.env.UNIVERSITY_DOMAIN || "dtu.ac.in";
+      if (emailDomain !== allowedDomain) {
+        results.errors.push({
+          row: rollNo,
+          reason: `Invalid email domain. Must be @${allowedDomain}`,
+        });
+        continue;
+      }
+
+      // Check if student already exists
+      const existing = await Student.findOne({
+        $or: [{ email }, { rollNo }],
+      });
+
+      if (existing) {
+        results.skipped.push({
+          row: rollNo,
+          reason: existing.email === email
+            ? "Email already registered"
+            : "Roll number already registered",
+          accountStatus: existing.accountStatus,
+        });
+        continue;
+      }
+
+      // Generate activation token
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+     // Parse academic data from row
+const cgpa = row.cgpa ? parseFloat(row.cgpa) : undefined;
+const tenth_percentage = row.tenth_percentage || row.tenth || row["10th"] ? parseFloat(row.tenth_percentage || row.tenth || row["10th"]) : undefined;
+const twelfth_percentage = row.twelfth_percentage || row.twelfth || row["12th"] ? parseFloat(row.twelfth_percentage || row.twelfth || row["12th"]) : undefined;
+const tenth_board = row.tenth_board || row.board_10 || "";
+const twelfth_board = row.twelfth_board || row.board_12 || "";
+
+// Build education array
+const education = [];
+if (tenth_percentage) {
+  education.push({
+    level: "10th",
+    percentage: tenth_percentage,
+    board: tenth_board,
+  });
+}
+if (twelfth_percentage) {
+  education.push({
+    level: "12th",
+    percentage: twelfth_percentage,
+    board: twelfth_board,
+  });
+}
+
+// Create student account
+const student = await Student.create({
+  name,
+  email,
+  rollNo: rollNo.toString().toUpperCase().trim(),
+  branch: branch.toUpperCase().trim(),
+  year: parseInt(year) || 4,
+  phone: phone?.toString() || "",
+  password: crypto.randomBytes(16).toString("hex"),
+  accountStatus: "pending_activation",
+  source: "admin_import",
+  isVerified: true,
+  activationToken: hashedToken,
+  activationTokenExpiry: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  // Academic data — auto-locked
+  ...(cgpa && { cgpa }),
+  ...(education.length > 0 && { education }),
+  isProfileLocked: education.length > 0 || cgpa ? true : false,
+});
+
+      results.imported.push({
+        name: student.name,
+        email: student.email,
+        rollNo: student.rollNo,
+      });
+
+      // Queue activation email
+      emailQueue.push({ student, rawToken });
+
+    } catch (err) {
+      results.errors.push({
+        row: row.rollNo || row.email,
+        reason: err.message,
+      });
+    }
+  }
+
+  // Send activation emails in batches of 50
+  for (let i = 0; i < emailQueue.length; i += batchSize) {
+    const batch = emailQueue.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async ({ student, rawToken }) => {
+        const activationUrl = `${process.env.CLIENT_URL}/activate?token=${rawToken}`;
+        try {
+          await sendEmail({
+            to: student.email,
+            subject: "Welcome to Placement Portal — Activate Your Account",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+                <h2 style="color: #4F46E5;">Welcome to Placement Portal! 🎉</h2>
+                <p>Dear ${student.name},</p>
+                <p>Your account has been created by the placement cell. Click below to activate your account and set your password.</p>
+                <div style="background: #F3F4F6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                  <p style="margin: 0;"><strong>Roll No:</strong> ${student.rollNo}</p>
+                  <p style="margin: 8px 0 0;"><strong>Branch:</strong> ${student.branch}</p>
+                  <p style="margin: 8px 0 0;"><strong>Email:</strong> ${student.email}</p>
+                </div>
+                <div style="text-align: center; margin: 24px 0;">
+                  <a href="${activationUrl}"
+                    style="background: #4F46E5; color: white; padding: 12px 32px;
+                    border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+                    Activate My Account
+                  </a>
+                </div>
+                <p style="color: #6B7280; font-size: 14px;">
+                  This link expires in <strong>7 days</strong>.
+                  If it expires, use the "Resend Activation" option on the login page.
+                </p>
+                <p style="color: #6B7280; font-size: 12px;">
+                  Or copy this link: ${activationUrl}
+                </p>
+              </div>
+            `,
+          });
+        } catch (emailErr) {
+          console.error(`Failed to send activation email to ${student.email}:`, emailErr.message);
+        }
+      })
+    );
+  }
+
+  // Invalidate students cache
+  invalidateCache(CACHE_KEYS.ALL_STUDENTS, CACHE_KEYS.STATS, "all_students_p1");
+
+  res.json({
+    success: true,
+    message: `Import complete! ${results.imported.length} students imported.`,
+    data: {
+      totalProvided: students.length,
+      imported: results.imported.length,
+      skipped: results.skipped.length,
+      errors: results.errors.length,
+      importedList: results.imported,
+      skippedList: results.skipped,
+      errorList: results.errors,
+    },
+  });
+});
+
 module.exports = {
   createJob, updateJob, deleteJob, getAllJobs,
   getApplicants, updateApplicationStatus, exportApplicantsExcel,
-  bulkUpdateStatus,
+  bulkUpdateStatus, bulkImportStudents,
   getAllStudents, getStudentProfile, updateStudentProfile, lockStudentProfile,
   verifyStudent, blockStudent, unblockStudent,
   getStats, bulkNotify,

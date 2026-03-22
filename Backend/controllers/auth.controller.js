@@ -4,7 +4,7 @@ const Admin = require("../models/Admin.model");
 const Otp = require("../models/Otp.model");
 const { asyncHandler } = require("../middleware/error.middleware");
 const { sendEmail } = require("../utils/email.util");
-
+const crypto = require("crypto");
 const ALLOWED_DOMAIN = process.env.UNIVERSITY_DOMAIN || "dtu.ac.in";
 
 const generateTokens = (id, role) => {
@@ -99,9 +99,12 @@ const verifyOtp = asyncHandler(async (req, res) => {
 
   const { name, password, rollNo, branch, year, phone } = otpRecord.data;
 
-  const student = await Student.create({
-    name, email, password, rollNo, branch, year, phone,
-  });
+const student = await Student.create({
+  name, email, password, rollNo, branch, year, phone,
+  accountStatus: "pending_verification",
+  source: "self_signup",
+  isVerified: false,
+});
 
   await Otp.deleteMany({ email });
 
@@ -171,13 +174,32 @@ const login = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if student is blocked — prevent login
-  if (role === "student" && user.isBlocked) {
-    return res.status(403).json({
-      success: false,
-      message: `Your account has been debarred. Reason: ${user.blockReason || "Unfair means"}. Please contact the placement cell.`,
-      isBlocked: true,
-    });
+  // Check student account status
+  if (role === "student") {
+    if (user.accountStatus === "pending_activation") {
+      return res.status(403).json({
+        success: false,
+        message: "Please activate your account. Check your email for the activation link.",
+        accountStatus: "pending_activation",
+        email: user.email,
+      });
+    }
+
+    if (user.accountStatus === "pending_verification") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is pending verification by the placement cell. Please wait for approval.",
+        accountStatus: "pending_verification",
+      });
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        message: `Your account has been debarred. Reason: ${user.blockReason || "Unfair means"}. Please contact the placement cell.`,
+        isBlocked: true,
+      });
+    }
   }
 
   const { accessToken, refreshToken } = generateTokens(user._id, role);
@@ -192,7 +214,11 @@ const login = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       role,
-      ...(role === "student" && { rollNo: user.rollNo, branch: user.branch }),
+      ...(role === "student" && {
+        rollNo: user.rollNo,
+        branch: user.branch,
+        accountStatus: user.accountStatus,
+      }),
     },
   });
 });
@@ -315,6 +341,125 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Activate account (imported students set password)
+// @route   POST /api/auth/activate
+const activateAccount = asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Token and password are required.",
+    });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 6 characters.",
+    });
+  }
+
+  // Hash the token to compare with DB
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const student = await Student.findOne({
+    activationToken: hashedToken,
+    activationTokenExpiry: { $gt: Date.now() },
+  });
+
+  if (!student) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired activation link. Please request a new one.",
+    });
+  }
+
+  // Set password and activate
+  student.password = password;
+  student.accountStatus = "active";
+  student.isVerified = true;
+  student.activationToken = undefined;
+  student.activationTokenExpiry = undefined;
+  await student.save();
+
+  // Generate tokens for auto-login
+  const { accessToken, refreshToken } = generateTokens(student._id, "student");
+
+  res.json({
+    success: true,
+    message: "Account activated successfully! Welcome to the Placement Portal.",
+    accessToken,
+    refreshToken,
+    user: {
+      id: student._id,
+      name: student.name,
+      email: student.email,
+      rollNo: student.rollNo,
+      role: "student",
+      accountStatus: "active",
+    },
+  });
+});
+
+// @desc    Resend activation link
+// @route   POST /api/auth/resend-activation
+const resendActivation = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const student = await Student.findOne({
+    email,
+    accountStatus: "pending_activation",
+  });
+
+  if (!student) {
+    return res.status(404).json({
+      success: false,
+      message: "No pending activation account found with this email.",
+    });
+  }
+
+  // Generate new activation token
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+  student.activationToken = hashedToken;
+  student.activationTokenExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+  await student.save();
+
+  const activationUrl = `${process.env.CLIENT_URL}/activate?token=${rawToken}`;
+
+  await sendEmail({
+    to: student.email,
+    subject: "Activate your Placement Portal account",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+        <h2 style="color: #4F46E5;">Activate Your Account</h2>
+        <p>Dear ${student.name},</p>
+        <p>Click the button below to activate your placement portal account and set your password.</p>
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${activationUrl}"
+            style="background: #4F46E5; color: white; padding: 12px 32px;
+            border-radius: 8px; text-decoration: none; font-weight: 600;">
+            Activate Account
+          </a>
+        </div>
+        <p style="color: #6B7280; font-size: 14px;">
+          This link expires in <strong>7 days</strong>.
+        </p>
+        <p style="color: #6B7280; font-size: 12px;">
+          Or copy this link: ${activationUrl}
+        </p>
+      </div>
+    `,
+  });
+
+  res.json({
+    success: true,
+    message: `Activation link sent to ${email}`,
+  });
+});
+
 module.exports = {
   registerStudent,
   verifyOtp,
@@ -323,4 +468,6 @@ module.exports = {
   getMe,
   forgotPassword,
   resetPassword,
+  activateAccount,
+  resendActivation,
 };

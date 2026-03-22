@@ -37,7 +37,19 @@ const studentSchema = new mongoose.Schema(
     placedCompany: { type: String },
     ctcOffered: { type: Number },
     isProfileComplete: { type: Boolean, default: false },
-    isVerified: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false }, // keep for backward compatibility
+accountStatus: {
+  type: String,
+  enum: ["pending_activation", "pending_verification", "active"],
+  default: "pending_verification",
+},
+source: {
+  type: String,
+  enum: ["admin_import", "self_signup"],
+  default: "self_signup",
+},
+activationToken: { type: String, select: false },
+activationTokenExpiry: { type: Date },
     isBlocked: { type: Boolean, default: false },
     blockReason: { type: String, default: "" },
     isProfileLocked: { type: Boolean, default: false },
@@ -64,4 +76,6 @@ studentSchema.index({ rollNo: 1 }, { unique: true });
 studentSchema.index({ email: 1 }, { unique: true });
 studentSchema.index({ branch: 1, isPlaced: 1 });
 studentSchema.index({ isVerified: 1, isBlocked: 1 });
+studentSchema.index({ accountStatus: 1 });
+studentSchema.index({ activationToken: 1 });
 module.exports = mongoose.model("Student", studentSchema);
