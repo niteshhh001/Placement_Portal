@@ -316,6 +316,9 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
     .populate("student job");
   if (!application) return res.status(404).json({ success: false, message: "Application not found." });
 
+  // Store previous status before updating
+  const previousStatus = application.status;
+
   application.status = status;
   if (adminRemarks) application.adminRemarks = adminRemarks;
 
@@ -330,8 +333,8 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
 
   await application.save();
 
-  // If selected — mark student as placed
-  if (status === "selected") {
+  // If status changed TO selected AND was not already selected before
+  if (status === "selected" && previousStatus !== "selected") {
     await Student.findByIdAndUpdate(application.student._id, {
       isPlaced: true,
       placedAt: application.job._id,
@@ -353,7 +356,20 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  if (status === "rejected") {
+  // If status changed FROM selected to something else — reverse placement
+  if (previousStatus === "selected" && status !== "selected") {
+    await Student.findByIdAndUpdate(application.student._id, {
+      isPlaced: false,
+      placedAt: null,
+      placedCompany: null,
+      ctcOffered: null,
+    });
+    await Job.findByIdAndUpdate(application.job._id, {
+      $inc: { totalSelected: -1 },
+    });
+  }
+
+  if (status === "rejected" && previousStatus !== "rejected") {
     await sendEmail({
       to: application.student.email,
       subject: `Update on your application at ${application.job.companyName}`,
@@ -365,9 +381,10 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
       `,
     });
   }
+
   invalidateCache(CACHE_KEYS.STATS);
-  // Invalidate applicants cache for this job
-invalidateCache(`applicants_${application.job}_p1_sall_ball`);
+  invalidateCache(`applicants_${application.job._id}_p1_sall_ball`);
+
   res.json({ success: true, message: "Status updated.", data: application });
 });
 
@@ -489,7 +506,9 @@ const getAllStudents = asyncHandler(async (req, res) => {
 const verifyStudent = asyncHandler(async (req, res) => {
   const student = await Student.findByIdAndUpdate(
     req.params.id,
-    { isVerified: true },
+    { isVerified: true,
+      accountStatus: "active",
+     },
     { new: true }
   );
 
@@ -643,22 +662,18 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
     return String(r)
       .toUpperCase()
       .trim()
-      .replace(/[-_\s\/]/g, "")  // remove dashes, underscores, spaces, slashes
-      .replace(/^0+/, "");        // remove leading zeros
+      .replace(/[-_\s\/]/g, "")
+      .replace(/^0+/, "");
   };
 
   const normalizedInput = rollNumbers.map(normalizeRollNo);
-
-  // Remove duplicates
   const uniqueInput = [...new Set(normalizedInput)];
   const duplicates = normalizedInput.filter(
     (r, i) => normalizedInput.indexOf(r) !== i
   );
 
-  // Find all students
   const allStudents = await Student.find({}, { rollNo: 1, name: 1, email: 1 });
 
-  // Match with normalization
   const matchedStudents = allStudents.filter((s) =>
     uniqueInput.includes(normalizeRollNo(s.rollNo))
   );
@@ -680,21 +695,18 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
 
   const studentIds = matchedStudents.map((s) => s._id);
 
-  // Find applications for this job
   const applications = await Application.find({
     job: req.params.id,
     student: { $in: studentIds },
   }).populate("student job");
 
-  // Find already same status (skip these)
   const alreadySameStatus = applications
     .filter((app) => app.status === status)
     .map((app) => app.student?.rollNo);
 
-  // Applications that need updating
   const toUpdate = applications.filter((app) => app.status !== status);
 
-  // DRY RUN — return preview without updating
+  // DRY RUN
   if (isDryRun) {
     return res.json({
       success: true,
@@ -721,16 +733,17 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  // ACTUAL UPDATE — process in batches
+  // ACTUAL UPDATE
   const updated = [];
   const errors = [];
 
   for (const app of toUpdate) {
     try {
+      const previousStatus = app.status; // ← store previous status
       app.status = status;
       await app.save();
 
-      // Send email only if status actually changed
+      // Send emails
       if (status === "shortlisted") {
         await sendEmail({
           to: app.student.email,
@@ -799,7 +812,8 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
         });
       }
 
-      if (status === "selected") {
+      // Only increment if status changed TO selected AND was not already selected
+      if (status === "selected" && previousStatus !== "selected") {
         await Student.findByIdAndUpdate(app.student._id, {
           isPlaced: true,
           placedAt: app.job._id,
@@ -825,6 +839,17 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
             </div>
           `,
         });
+      }
+
+      // If changed FROM selected to something else — reverse placement
+      if (previousStatus === "selected" && status !== "selected") {
+        await Student.findByIdAndUpdate(app.student._id, {
+          isPlaced: false,
+          placedAt: null,
+          placedCompany: null,
+          ctcOffered: null,
+        });
+        await Job.findByIdAndUpdate(app.job._id, { $inc: { totalSelected: -1 } });
       }
 
       if (status === "rejected") {
@@ -875,7 +900,6 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
     console.error("Audit log failed:", err.message);
   }
 
-  // Invalidate cache
   invalidateCache(CACHE_KEYS.STATS);
 
   res.json({
