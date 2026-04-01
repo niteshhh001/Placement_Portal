@@ -25,6 +25,19 @@ API.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Handle server errors — redirect to error page
+    if (error.response?.status === 500) {
+      window.location.href = "/error?code=500";
+      return Promise.reject(error);
+    }
+
+    // Handle 404 from API
+    if (error.response?.status === 404 && original.url !== "/auth/refresh") {
+      window.location.href = "/error?code=404";
+      return Promise.reject(error);
+    }
+
+    // Handle token refresh
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
@@ -42,9 +55,9 @@ API.interceptors.response.use(
         window.location.href = "/login";
       }
     }
+
     return Promise.reject(error);
   }
 );
-
 
 export default API;
