@@ -59,15 +59,24 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Toaster position="top-right" />
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 w-full max-w-md p-8">
+    {/* Header */}
+     <div className="text-center mb-8">
+  <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-green-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+    <img
+      src="/logo.png"
+      alt="Placement Portal"
+      className="w-8 h-8 object-contain"
+    />
+  </div>
 
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-xl font-bold">P</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Placement Portal</h1>
-          <p className="text-gray-500 mt-1 text-sm">Sign in to your account</p>
-        </div>
+  <h1 className="text-2xl font-bold text-gray-900">
+    Placement Portal
+  </h1>
+
+  <p className="text-gray-500 mt-1 text-sm">
+    Sign in to your account
+  </p>
+     </div>
 
         {/* Blocked Banner */}
         {isBlocked && (

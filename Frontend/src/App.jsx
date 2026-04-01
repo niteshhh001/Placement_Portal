@@ -25,6 +25,7 @@ import AdminStudents from "./pages/admin/Students";
 import Notifications from "./pages/admin/Notifications";
 import StudentProfile from "./pages/admin/StudentProfile";
 import ImportStudents from "./pages/admin/ImportStudents";
+import Landing from "./pages/Landing";
 
 function App() {
   return (
@@ -33,8 +34,10 @@ function App() {
         <BrowserRouter>
           <Routes>
 
+            <Route path="/" element={<Landing />} />
+
             {/* Public routes */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/home" element={<Navigate to="/" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
