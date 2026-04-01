@@ -37,11 +37,16 @@ function FeatureCard({ icon, title, description, delay }) {
 
 export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrollY(window.scrollY);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileMenuOpen]);
 
   return (
     <>
@@ -633,39 +638,152 @@ export default function LandingPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
+        /* ── HAMBURGER ── */
+        .hamburger {
+          display: none; flex-direction: column;
+          gap: 5px; cursor: pointer; padding: 6px;
+          background: none; border: none;
+          z-index: 200;
+        }
+        .hamburger span {
+          display: block; width: 22px; height: 2px;
+          background: var(--ink); border-radius: 2px;
+          transition: all 0.3s ease;
+          transform-origin: center;
+        }
+        .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        .hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+        .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+        /* ── MOBILE DRAWER ── */
+        .mobile-overlay {
+          display: none; position: fixed; inset: 0; z-index: 150;
+          background: rgba(15,15,26,0.45);
+          backdrop-filter: blur(4px);
+          animation: fadeIn 0.2s ease;
+        }
+        .mobile-drawer {
+          position: absolute; top: 0; right: 0; bottom: 0;
+          width: 80%; max-width: 300px;
+          background: var(--surface);
+          border-left: 1px solid var(--border);
+          padding: 80px 28px 40px;
+          display: flex; flex-direction: column;
+          animation: slideIn 0.3s ease;
+          box-shadow: -8px 0 40px rgba(0,0,0,0.1);
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .mobile-nav-links {
+          list-style: none; display: flex;
+          flex-direction: column; gap: 4px; margin-bottom: 32px;
+        }
+        .mobile-nav-links a {
+          display: block; padding: 12px 16px;
+          font-size: 16px; font-weight: 600;
+          color: var(--ink); text-decoration: none;
+          border-radius: 10px; transition: all 0.15s;
+        }
+        .mobile-nav-links a:hover { background: var(--tag-bg); color: var(--primary); }
+        .mobile-cta { display: flex; flex-direction: column; gap: 10px; }
+        .mobile-cta a {
+          display: flex; align-items: center; justify-content: center;
+          padding: 13px 20px; border-radius: 10px;
+          font-size: 15px; font-weight: 600; text-decoration: none;
+          transition: all 0.2s;
+        }
+        .mobile-cta .m-signin {
+          border: 1.5px solid var(--border-2);
+          color: var(--ink); background: transparent;
+        }
+        .mobile-cta .m-signin:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-lt); }
+        .mobile-cta .m-start {
+          background: var(--primary); color: white;
+          box-shadow: 0 4px 14px rgba(79,70,229,0.3);
+        }
+        .mobile-cta .m-start:hover { background: var(--primary-dk); }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 768px) {
-          .nav { padding: 14px 20px; }
-          .nav.scrolled { padding: 10px 20px; }
+          .nav {
+            padding: 14px 20px;
+            background: rgba(255,255,255,0.96);
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+          }
+          .nav.scrolled { padding: 12px 20px; }
           .nav-links { display: none; }
+          .nav-cta { display: none; }
+          .hamburger { display: flex; }
+          .mobile-overlay { display: block; }
+
+          .hero { padding: 110px 20px 60px; }
+
+          .stats { padding: 40px 20px; }
           .stats-inner { grid-template-columns: repeat(2, 1fr); }
           .stat-item:nth-child(2) { border-right: none; }
+          .stat-item:nth-child(3) { border-top: 1px solid var(--border); }
+          .stat-item:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
+
           .features-grid { grid-template-columns: 1fr; }
+
           .steps { grid-template-columns: 1fr; }
           .step { border-right: none; border-bottom: 1px solid var(--border); }
           .step:last-child { border-bottom: none; }
           .step-arrow { display: none; }
+
           .roles { grid-template-columns: 1fr; }
+
           .footer-inner { grid-template-columns: 1fr; gap: 36px; }
           .footer-bottom { flex-direction: column; text-align: center; }
+
           .section { padding: 64px 20px; }
-          .cta-box { padding: 40px 24px; }
+          .cta-box { padding: 40px 20px; }
           .preview-content { grid-template-columns: repeat(2, 1fr); }
+
+          .hero-title { letter-spacing: -0.02em; }
+          .section-title { letter-spacing: -0.02em; }
+        }
+
+        @media (max-width: 480px) {
+          .stats-inner { grid-template-columns: 1fr 1fr; }
+          .stat-number { font-size: 36px; }
+          .preview-content { grid-template-columns: 1fr 1fr; gap: 8px; padding: 16px; }
+          .preview-stat { padding: 12px 10px; }
+          .preview-stat-val { font-size: 18px; }
         }
       `}</style>
 
+      {/* ── MOBILE DRAWER ── */}
+      {mobileMenuOpen && (
+        <div className="mobile-overlay" onClick={() => setMobileMenuOpen(false)}>
+          <div className="mobile-drawer" onClick={e => e.stopPropagation()}>
+            <ul className="mobile-nav-links">
+              <li><a href="#features" onClick={() => setMobileMenuOpen(false)}>Features</a></li>
+              <li><a href="#how-it-works" onClick={() => setMobileMenuOpen(false)}>How It Works</a></li>
+              <li><a href="#roles" onClick={() => setMobileMenuOpen(false)}>For You</a></li>
+              <li><a href="#tech" onClick={() => setMobileMenuOpen(false)}>Tech Stack</a></li>
+            </ul>
+            <div className="mobile-cta">
+              <a href="https://placement-portal-red.vercel.app/login" className="m-signin">Sign In</a>
+              <a href="https://placement-portal-red.vercel.app/register" className="m-start">Get Started →</a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── NAV ── */}
-      <nav className={`nav ${scrollY > 60 ? "scrolled" : ""}`}>
-<a href="/" className="flex items-center gap-3">
-  <img
-    src="/logo.png"
-    alt="Placement Portal"
-    className="w-12 h-12 object-contain"
-  />
-  <span className="text-xl font-semibold text-gray-900 dark:text-white">
-    PlacementPortal
-  </span>
-</a>
+ <nav className={`nav ${scrollY > 60 ? "scrolled" : ""}`}>
+  <a href="#" className="nav-logo flex items-center gap-2">
+    <img
+      src="/logo.png"
+      alt="Placement Portal"
+      className="w-12 h-12 object-contain"
+    />
+    <span className="nav-logo-text text-lg font-semibold">
+      PlacementPortal
+    </span>
+  </a>
         <ul className="nav-links">
           <li><a href="#features">Features</a></li>
           <li><a href="#how-it-works">How It Works</a></li>
@@ -676,6 +794,13 @@ export default function LandingPage() {
           <a href="https://placement-portal-red.vercel.app/login" className="btn-ghost">Sign In</a>
           <a href="https://placement-portal-red.vercel.app/register" className="btn-primary">Get Started →</a>
         </div>
+        <button
+          className={`hamburger ${mobileMenuOpen ? "open" : ""}`}
+          onClick={() => setMobileMenuOpen(o => !o)}
+          aria-label="Toggle menu"
+        >
+          <span /><span /><span />
+        </button>
       </nav>
 
       {/* ── HERO ── */}
@@ -881,17 +1006,10 @@ export default function LandingPage() {
       <footer className="footer">
         <div className="footer-inner">
           <div>
-  <div className="flex items-center gap-0 mb-4">
-    <img
-      src="/logo.png"
-      alt="Placement Portal"
-      className="w-12 h-15 object-contain"
-    />
-    <div className="text-lg font-semibold text-gray-900 dark:text-white">
-      PlacementPortal
-    </div>
-  </div>
-
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div className="nav-logo-icon">P</div>
+              <div className="footer-brand-name">PlacementPortal</div>
+            </div>
             <p className="footer-brand-desc">
               A production-grade college placement management system — built to streamline every step from student onboarding to final selection.
             </p>
