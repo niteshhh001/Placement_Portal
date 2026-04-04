@@ -1023,7 +1023,7 @@ export default function LandingPage() {
               <div className="footer-contact-icon">in</div>Navneet Singh
             </a>
             <a href="https://github.com/niteshhh001" target="_blank" rel="noreferrer" className="footer-contact-item">
-              <div className="footer-contact-icon">⌥</div>github.com/niteshhh001
+              <div className="footer-contact-icon">⌥</div>github.com/navneetsinghI9
             </a>
           </div>
           <div>
