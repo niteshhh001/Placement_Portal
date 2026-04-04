@@ -1014,13 +1014,13 @@ export default function LandingPage() {
               A production-grade college placement management system — built to streamline every step from student onboarding to final selection.
             </p>
             <a href="mailto:kumarjhanitesh09@gmail.com" className="footer-contact-item">
-              <div className="footer-contact-icon">✉</div>kumarjhanitesh09@gmail.com
+              <div className="footer-contact-icon">✉</div>thenavneetsinghsri@gmail.com
             </a>
             <a href="tel:+919212290136" className="footer-contact-item">
               <div className="footer-contact-icon">📞</div>+91 9212290136
             </a>
             <a href="http://www.linkedin.com/in/nitesh-kumar-jha-55b484263" target="_blank" rel="noreferrer" className="footer-contact-item">
-              <div className="footer-contact-icon">in</div>Nitesh Kumar Jha
+              <div className="footer-contact-icon">in</div>Navneet Singh
             </a>
             <a href="https://github.com/niteshhh001" target="_blank" rel="noreferrer" className="footer-contact-item">
               <div className="footer-contact-icon">⌥</div>github.com/niteshhh001
@@ -1047,7 +1047,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="footer-bottom">
-          <p className="footer-copy">© 2026 PlacementPortal. Built with ♥ by <span>Nitesh Kumar Jha</span></p>
+          <p className="footer-copy">© 2026 PlacementPortal. Built with ♥ by <span>Navneet Singh</span></p>
           <div className="social-links">
             <a href="https://github.com/niteshhh001" target="_blank" rel="noreferrer" className="social-link">⌥</a>
             <a href="http://www.linkedin.com/in/nitesh-kumar-jha-55b484263" target="_blank" rel="noreferrer" className="social-link">in</a>
