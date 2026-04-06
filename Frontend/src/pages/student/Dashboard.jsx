@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import API from "../../api/axios";
-
+import { DashboardStatsSkeleton } from "../../components/Skeleton";
 export default function Dashboard() {
   const { user } = useAuth();
   const [applications, setApplications] = useState([]);
@@ -47,11 +47,7 @@ export default function Dashboard() {
     "on-hold": "bg-gray-100 text-gray-700",
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-    </div>
-  );
+if (loading) return <DashboardStatsSkeleton />;
 
   return (
     <div className="space-y-6">

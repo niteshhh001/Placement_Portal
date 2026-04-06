@@ -4,7 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import ResumeViewer from "../../components/ResumeViewer";
 import Pagination from "../../components/Pagination";
-
+import { StudentsTableSkeleton } from "../../components/Skeleton";
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -238,9 +238,9 @@ export default function AdminStudents() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"></div>
-                  </td>
+                  <td colSpan={7}>
+      <StudentsTableSkeleton rows={8} />
+    </td>
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
