@@ -4,7 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 import Pagination from "../../components/Pagination";
-
+import { JobsListSkeleton } from "../../components/Skeleton";
 const SECTORS = ["IT", "Core", "Finance", "Consulting", "Government", "Analytics", "Other"];
 
 export default function Jobs() {
@@ -54,11 +54,7 @@ export default function Jobs() {
   // Filter eligible only on frontend (already paginated from backend)
   const displayed = showEligible ? jobs.filter((j) => j.eligible) : jobs;
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-    </div>
-  );
+if (loading) return <JobsListSkeleton count={5} />;
 
   return (
     <div className="space-y-6">

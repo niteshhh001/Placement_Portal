@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import Pagination from "../../components/Pagination";
-
+import { ApplicationsListSkeleton } from "../../components/Skeleton";
 const statusColors = {
   applied: "bg-blue-100 text-blue-700",
   shortlisted: "bg-yellow-100 text-yellow-700",
@@ -66,11 +66,7 @@ export default function Applications() {
     return new Date() <= new Date(app.job.applicationDeadline);
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-    </div>
-  );
+if (loading) return <ApplicationsListSkeleton count={4} />;
 
   return (
     <div className="space-y-6">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import API from "../../api/axios";
-
+import { AdminDashboardSkeleton } from "../../components/Skeleton"
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,11 +21,7 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-    </div>
-  );
+if (loading) return <AdminDashboardSkeleton />;
 
   const { overview, packageStats, branchStats, topCompanies, monthlyTrend } = stats;
 

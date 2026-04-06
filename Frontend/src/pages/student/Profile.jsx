@@ -4,7 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 import API from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 import ResumeViewer from "../../components/ResumeViewer";
-
+import { ProfileSkeleton } from "../../components/Skeleton";
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -176,11 +176,7 @@ export default function Profile() {
   const lockedInputClass = "w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm bg-gray-50 text-gray-500 cursor-not-allowed";
   const normalInputClass = "w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-    </div>
-  );
+if (loading) return <ProfileSkeleton />;
 
   return (
     <div className="max-w-2xl space-y-6">
