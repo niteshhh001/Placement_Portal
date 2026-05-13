@@ -1038,21 +1038,21 @@ export default function LandingPage() {
           </div>
           <div>
             <div className="footer-col-title">Developer</div>
-         /*   <ul className="footer-links">
+            {/*   <ul className="footer-links">
               <li><a href="https://github.com/niteshhh001/Placement_Portal" target="_blank" rel="noreferrer">GitHub Repo</a></li>
               <li><a href="https://my-port-folio-nitesh.vercel.app/" target="_blank" rel="noreferrer">Portfolio</a></li>
               <li><a href="http://www.linkedin.com/in/nitesh-kumar-jha-55b484263" target="_blank" rel="noreferrer">LinkedIn</a></li>
               <li><a href="https://placement-portal-f7dv.onrender.com/api/health" target="_blank" rel="noreferrer">API Health</a></li>
-            </ul> */
+            </ul> */}
           </div>
         </div>
         <div className="footer-bottom">
           <p className="footer-copy">© 2026 PlacementPortal. Built with ♥ by <span>CodeNet</span></p>
           <div className="social-links">
-            <a href="https://github.com/niteshhh001" target="_blank" rel="noreferrer" className="social-link">⌥</a>
+            {/*  <a href="https://github.com/niteshhh001" target="_blank" rel="noreferrer" className="social-link">⌥</a>
             <a href="http://www.linkedin.com/in/nitesh-kumar-jha-55b484263" target="_blank" rel="noreferrer" className="social-link">in</a>
             <a href="mailto:kumarjhanitesh09@gmail.com" className="social-link">✉</a>
-            <a href="https://my-port-folio-nitesh.vercel.app/" target="_blank" rel="noreferrer" className="social-link">◈</a>
+            <a href="https://my-port-folio-nitesh.vercel.app/" target="_blank" rel="noreferrer" className="social-link">◈</a> */}
           </div>
         </div>
       </footer>
