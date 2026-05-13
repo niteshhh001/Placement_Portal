@@ -1013,18 +1013,18 @@ export default function LandingPage() {
             <p className="footer-brand-desc">
               A production-grade college placement management system — built to streamline every step from student onboarding to final selection.
             </p>
-            <a href="mailto:kumarjhanitesh09@gmail.com" className="footer-contact-item">
-              <div className="footer-contact-icon">✉</div>kumarjhanitesh09@gmail.com
+            <a href="mailto:kumarjhanitesh0@gmail.com" className="footer-contact-item">
+              <div className="footer-contact-icon">✉</div>help@codenet.com
             </a>
-            <a href="tel:+919212290136" className="footer-contact-item">
+            {/*  <a href="tel:+919212290136" className="footer-contact-item">
               <div className="footer-contact-icon">📞</div>+91 9212290136
-            </a>
+            </a> 
             <a href="http://www.linkedin.com/in/nitesh-kumar-jha-55b484263" target="_blank" rel="noreferrer" className="footer-contact-item">
               <div className="footer-contact-icon">in</div>Nitesh Jha
             </a>
             <a href="https://github.com/niteshhh001" target="_blank" rel="noreferrer" className="footer-contact-item">
               <div className="footer-contact-icon">⌥</div>github.com/niteshhh001
-            </a>
+            </a> */}
           </div>
           <div>
             <div className="footer-col-title">Portal</div>
